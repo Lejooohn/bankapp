@@ -7,6 +7,18 @@ A powerful personal finance management platform to organize, categorize, and ana
 
 ![BankApp UI](https://img.shields.io/badge/Status-Production-green) ![License](https://img.shields.io/badge/License-AGPL--3.0-blue)
 
+## 📸 Screenshots
+
+The screenshots use a fictional demo account (names, amounts and dates are invented).
+
+| Operations | Budgets |
+|---|---|
+| ![Operations list](docs/screenshots/operations.png) | ![Budgets](docs/screenshots/budgets.png) |
+| **Statistics** | **Login** |
+| ![Statistics](docs/screenshots/statistics.png) | ![Login](docs/screenshots/login.png) |
+
+---
+
 ## ✨ Features
 
 ### 📊 Core Functionality
