@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: ${CONTAINER_PREFIX:-bankapp}-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bankapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: bankapp
+    ports:
+      # Loopback only: the database is reached through the compose network, and from the host
+      # only by local tools. It is not exposed on the LAN.
+      - '127.0.0.1:${DB_PORT:-5433}:5432'
+    volumes:
+      # PostgreSQL 18+ images keep data in a major-version subdirectory of
+      # /var/lib/postgresql and refuse to start if the old /var/lib/postgresql/data
+      # mount is used. The single mount at the parent is the layout the image expects.
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bankapp']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: prod
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-dev}
+    container_name: ${CONTAINER_PREFIX:-bankapp}-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Paris
+      NODE_ENV: production
+      DATABASE_URL: postgresql://bankapp:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/bankapp
+      PORT: 3000
+      AUTH_TOKEN:
+      # env_file's BACKUP_DIR is the host path used to resolve the volume
+      # mount below; override it here so the app sees the container-side
+      # mount point instead of a host path that doesn't exist in the container.
+      BACKUP_DIR: /backups
+    ports:
+      - '127.0.0.1:${API_PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.prod
+    container_name: ${CONTAINER_PREFIX:-bankapp}-web
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-5173}:8080'
+    environment:
+      # Address range of the reverse proxy in front of the stack (DSM). Its X-Forwarded-For is
+      # trusted only from this range. Verify on the NAS before changing it.
+      TRUSTED_PROXY_CIDR: ${TRUSTED_PROXY_CIDR:-172.16.0.0/12}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backup:
+    image: prodrigestivill/postgres-backup-local:18-alpine
+    container_name: ${CONTAINER_PREFIX:-bankapp}-backup
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Paris
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: bankapp
+      POSTGRES_USER: bankapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      SCHEDULE: "0 23 * * *"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+    # The image declares /var/lib/postgresql as a volume, which Docker filled with an
+    # anonymous volume nobody uses. The sidecar dumps over the network, so it gets a tmpfs.
+    tmpfs:
+      - /var/lib/postgresql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # Override the image's built-in healthcheck, which curls "localhost" and can
+      # resolve to ::1 — nothing listens on IPv6 in this stack, so force IPv4.
+      test: ['CMD-SHELL', 'curl -f http://127.0.0.1:8080/ || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  postgres_data:
+    # Create once by hand: `docker volume create ${PGDATA_VOLUME:-bankapp-pgdata}`.
+    # external: compose refuses to start when it is missing, instead of
+    # initialising an empty database on a fresh volume.
+    name: ${PGDATA_VOLUME:-bankapp-pgdata}
+    external: true
+
+networks:
+  default:
+    name: ${NETWORK_NAME:-bankapp-net}
+    external: true

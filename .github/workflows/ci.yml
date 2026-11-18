@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            shared/package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Shared package (tests and build)
+        working-directory: shared
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Backend (build and tests)
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+      - name: Frontend (build)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
