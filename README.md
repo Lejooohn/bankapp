@@ -9,13 +9,19 @@ A powerful personal finance management platform to organize, categorize, and ana
 
 ## 📸 Screenshots
 
-The screenshots use a fictional demo account (names, amounts and dates are invented).
+The screenshots use a fictional demo account (names, amounts and dates are invented). Account names come from the demo data.
 
-| Operations | Budgets |
-|---|---|
-| ![Operations list](docs/screenshots/operations.png) | ![Budgets](docs/screenshots/budgets.png) |
-| **Statistics** | **Login** |
-| ![Statistics](docs/screenshots/statistics.png) | ![Login](docs/screenshots/login.png) |
+**Français**
+
+| Login | Transactions | Budgets | Statistics |
+|---|---|---|---|
+| ![Connexion](docs/screenshots/fr-login.png) | ![Opérations](docs/screenshots/fr-operations.png) | ![Budgets](docs/screenshots/fr-budgets.png) | ![Statistiques](docs/screenshots/fr-statistics.png) |
+
+**English**
+
+| Login | Transactions | Budgets | Statistics |
+|---|---|---|---|
+| ![Login](docs/screenshots/en-login.png) | ![Transactions](docs/screenshots/en-operations.png) | ![Budgets](docs/screenshots/en-budgets.png) | ![Statistics](docs/screenshots/en-statistics.png) |
 
 ---
 
