@@ -575,6 +575,14 @@ audit (2026-11-16) and its open points are in `CHANGELOG.md` and `docs/api.md`.
 ---
 
 
+## ❤️ Support the project
+
+BankApp is free and will stay free. Every feature is available to everyone, with no paid tier.
+If it is useful to you and you want to support its development, you can send a voluntary contribution:
+[PayPal](https://paypal.me/lejooohn). Contributions are optional and do not unlock anything.
+
+---
+
 ## 📄 License
 
 GNU Affero General Public License v3.0 (AGPL-3.0) – See [LICENSE](LICENSE) for details.
