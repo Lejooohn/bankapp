@@ -17,13 +17,13 @@ The screenshots use a fictional demo account (names, amounts and dates are inven
 
 | Login | Transactions | Budgets | Statistics |
 |---|---|---|---|
-| ![Connexion](docs/screenshots/fr-login.png) | ![Opérations](docs/screenshots/fr-operations.png) | ![Budgets](docs/screenshots/fr-budgets.png) | ![Statistiques](docs/screenshots/fr-statistics.png) |
+| ![Connexion](docs/screenshots/1.2.0/fr-login.png) | ![Opérations](docs/screenshots/1.2.0/fr-operations.png) | ![Budgets](docs/screenshots/1.2.0/fr-budgets.png) | ![Statistiques](docs/screenshots/1.2.0/fr-statistics.png) |
 
 **English**
 
 | Login | Transactions | Budgets | Statistics |
 |---|---|---|---|
-| ![Login](docs/screenshots/en-login.png) | ![Transactions](docs/screenshots/en-operations.png) | ![Budgets](docs/screenshots/en-budgets.png) | ![Statistics](docs/screenshots/en-statistics.png) |
+| ![Login](docs/screenshots/1.2.0/en-login.png) | ![Transactions](docs/screenshots/1.2.0/en-operations.png) | ![Budgets](docs/screenshots/1.2.0/en-budgets.png) | ![Statistics](docs/screenshots/1.2.0/en-statistics.png) |
 
 ---
 
