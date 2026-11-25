@@ -5,6 +5,8 @@ and the version follows [SemVer](https://semver.org/) (see `docs/versioning.md`)
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-25
+
 ### Upgrade notes
 - `git pull`, then `docker compose up -d --build`. The database migration runs at startup and only adds a column
   (`categorization_rules.deleted_at`).
