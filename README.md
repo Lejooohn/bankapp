@@ -7,6 +7,8 @@ A powerful personal finance management platform to organize, categorize, and ana
 
 ![BankApp UI](https://img.shields.io/badge/Status-Production-green) ![License](https://img.shields.io/badge/License-AGPL--3.0-blue)
 
+**Latest version: 1.2.0** (2026-11-25). [What's new, and what to check before upgrading](CHANGELOG.md#120---2026-11-25)
+
 ## 📸 Screenshots
 
 The screenshots use a fictional demo account (names, amounts and dates are invented). Account names come from the demo data.
