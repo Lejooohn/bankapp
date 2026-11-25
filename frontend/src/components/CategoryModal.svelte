@@ -134,7 +134,7 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--text-1);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   .modal-close {
@@ -184,7 +184,7 @@
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--text-3);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   .category-input {
@@ -194,7 +194,7 @@
     background: var(--input-bg);
     color: var(--text-1);
     font-size: 14px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     outline: none;
     transition: border-color 0.15s;
   }
@@ -210,7 +210,7 @@
     font-weight: 500;
     cursor: pointer;
     border: none;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     transition: opacity 0.1s, background 0.1s;
   }
 

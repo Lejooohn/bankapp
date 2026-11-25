@@ -6,11 +6,12 @@ import zlib from 'zlib';
 import pool from '../db.js';
 import { RESTORABLE_TABLES, extractCopyBlock, buildStagingScript, loadStagingSchema, newStagingSchemaName, assertStagingSchema } from '../services/backup-restore-extract.js';
 import { checkAccountOwnership, performRestore, errMsg, captureAccountSnapshot, writeSafetySnapshot } from '../services/backup-restore-apply.js';
+import { BACKUP_FILENAME_RE, findBackupFile, isValidBackupName } from '../services/backup-files.js';
+import { backupCategorySchema } from '../lib/schemas.js';
 import { decryptBuffer } from '../services/encryption.js';
 
 const router = express.Router();
 
-const BACKUP_FILENAME_RE = /^bankapp-\d{8}-\d{6}\.sql\.gz$/;
 const SAFETY_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/;
 
 // Regex pour les safety snapshots : bankapp-safety-{timestamp}-{accountId}.json.gz
@@ -18,6 +19,7 @@ const SAFETY_FILENAME_RE = /^bankapp-safety-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-
 
 const restoreSchema = z.object({
   filename: z.string().min(1),
+  category: backupCategorySchema,
   tables: z.array(z.enum(RESTORABLE_TABLES)).min(1, 'Sélectionnez au moins un type de données'),
   destination: z.enum(['current', 'new']),
   newAccountName: z.string().min(1).optional(),
@@ -32,7 +34,7 @@ router.post('/accounts/:id/backup/restore', async (req, res) => {
   const parsed = restoreSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
 
-  const { filename, tables, destination, newAccountName } = parsed.data;
+  const { filename, category, tables, destination, newAccountName } = parsed.data;
   const accountId = req.params.id;
   const backupDir = process.env.BACKUP_DIR || '/backups';
 
@@ -57,7 +59,7 @@ router.post('/accounts/:id/backup/restore', async (req, res) => {
       if (!timestampPart || !SAFETY_TIMESTAMP_RE.test(timestampPart)) {
         return res.status(400).json({ error: 'Nom de fichier invalide' });
       }
-    } else if (!BACKUP_FILENAME_RE.test(filename)) {
+    } else if (!isValidBackupName(filename, category)) {
       return res.status(400).json({ error: 'Nom de fichier de sauvegarde invalide' });
     } else if (req.user.role !== 'admin') {
       // Full dumps hold every user's data; downloading and listing them is admin-only,
@@ -65,7 +67,7 @@ router.post('/accounts/:id/backup/restore', async (req, res) => {
       return res.status(403).json({ error: 'Réservé aux administrateurs' });
     }
 
-    const filePath = path.join(backupDir, 'last', filename);
+    const filePath = isSafetySnapshot ? path.join(backupDir, 'last', filename) : await findBackupFile(backupDir, filename, category);
     let snapshot: Record<string, any[]> | undefined;
     stagingSchema = isSafetySnapshot ? undefined : newStagingSchemaName();
 
@@ -168,7 +170,7 @@ router.delete('/accounts/:id/backup/safety-snapshot/:filename', async (req, res)
   }
 });
 
-// GET /api/backup/download/:filename - Download a full database backup (SQL.gz)
+// GET /api/backup/download/:filename?category= - Download a full database backup (SQL.gz)
 // Admin only: the dump contains every user's data (including password hashes),
 // so ownership of the triggering request is not a meaningful access boundary.
 router.get('/backup/download/:filename', async (req, res) => {
@@ -178,12 +180,13 @@ router.get('/backup/download/:filename', async (req, res) => {
   const backupDir = process.env.BACKUP_DIR || '/backups';
 
   // Validate filename to prevent path traversal
-  if (!BACKUP_FILENAME_RE.test(filename)) {
+  const category = backupCategorySchema.safeParse(req.query.category);
+  if (!category.success || !isValidBackupName(filename, category.data)) {
     return res.status(400).json({ error: 'Nom de fichier de sauvegarde invalide' });
   }
 
   try {
-    const filePath = path.join(backupDir, 'last', filename);
+    const filePath = await findBackupFile(backupDir, filename, category.data);
     const decrypted = decryptBuffer(await fs.readFile(filePath));
 
     // The on-disk file is encrypted at rest; decrypt here so the downloaded file is

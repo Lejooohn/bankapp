@@ -1,7 +1,7 @@
 <script lang="ts">
   import { lang, t } from '../../lib/i18n.ts';
   import { catStyle } from '../../utils/categoryColor.js';
-  import { CREDIT_TYPES, fmtAmount, parseLocalDate, remainingOccurrences } from './schedule-utils.ts';
+  import { CREDIT_TYPES, fmtAmount, parseLocalDate, remainingAmount, remainingOccurrences } from './schedule-utils.ts';
 
   let { schedules, sortColumn, sortDir, freqLabels, locale, onsort, ontoggle, ongenerate, onedit, ondelete }: {
     schedules: any[];
@@ -17,6 +17,7 @@
   } = $props();
 </script>
 
+<div class="sched-scroll">
 <table class="sched-table">
   <thead>
     <tr>
@@ -53,7 +54,8 @@
   <tbody>
     {#each schedules as s (s.id)}
       {@const remaining = remainingOccurrences(s)}
-      {@const isLast = remaining === 1}
+      {@const left = remainingAmount(s)}
+      {@const isLast = remaining === 1 && !s.is_completed}
       <tr class="sched-row {isLast ? 'sched-row-last' : ''} {s.is_completed ? 'sched-row-completed' : ''}">
         <td class="sched-cell-status">
           <button
@@ -89,8 +91,8 @@
           {#if s.category}<span class="sched-cat-badge" style={catStyle(s.category)}>{s.category}</span>{/if}
         </td>
         <td class="sched-cell-day">
-          {$t('le')} {s.day_of_month} {$t('du mois')}
-          {#if s.skip_weekends}<span style="font-size:11px;">· {$t('décalé si WE')}</span>{/if}
+          <span class="sched-line">{$t('le')} {s.day_of_month} {$t('du mois')}</span>
+          {#if s.skip_weekends}<span class="sched-line sched-weekend">{$t('décalé si WE')}</span>{/if}
         </td>
         <td class="sched-cell-next">
           {#if s.is_completed}
@@ -108,6 +110,16 @@
           <span class="sched-amount {CREDIT_TYPES.has(s.transaction_type) ? 'sched-credit' : 'sched-debit'}">
             {fmtAmount(s.amount, s.transaction_type)}
           </span>
+          {#if left !== null}
+            <span
+              class="sched-remaining"
+              class:off={!s.is_active}
+              title={$t(CREDIT_TYPES.has(s.transaction_type) ? 'Reste à recevoir jusqu\'au {date}' : 'Reste à payer jusqu\'au {date}')
+                .replace('{date}', parseLocalDate(s.end_date)?.toLocaleDateString(locale) ?? '')}
+            >
+              {$t('reste {amount} ({n}×)').replace('{amount}', `${left.toFixed(2)} €`).replace('{n}', String(remaining))}
+            </span>
+          {/if}
         </td>
         <td class="sched-cell-actions">
           <div class="sched-cell-actions-hover">
@@ -132,18 +144,22 @@
     {/each}
   </tbody>
 </table>
+</div>
 
 <style>
   /* ── Table ── */
+  /* Below the table's own minimum width it scrolls here, never the whole page */
+  .sched-scroll {
+    overflow-x: auto;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  }
   .sched-table {
     width: 100%; border-collapse: collapse;
-    background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
     table-layout: auto;
   }
   .sched-table thead { background: var(--surface); }
   .sched-table th {
-    padding: 14px 16px; text-align: center; font-size: 12px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 12px 8px; text-align: center; font-size: 12px; font-weight: 500;
     color: var(--text-3); border-bottom: 1px solid var(--border);
   }
   .sched-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
@@ -152,7 +168,7 @@
   .sort-arrow { display: inline-block; margin-left: 4px; font-size: 9px; }
   .sched-table tbody tr { border-bottom: 1px solid var(--border); }
   .sched-table tbody tr:hover { background: rgba(148, 163, 184, 0.04); }
-  .sched-table td { padding: 14px 16px; font-size: 13px; color: var(--text-2); vertical-align: middle; }
+  .sched-table td { padding: 12px 8px; font-size: 13px; color: var(--text-2); vertical-align: middle; }
 
   /* Column widths adapt to content */
   .sched-cell-status { white-space: nowrap; border-right: 1px solid var(--border); text-align: center; }
@@ -160,43 +176,35 @@
   .sched-cell-details { border-right: 1px solid var(--border); }
   .sched-cell-freq { white-space: nowrap; border-right: 1px solid var(--border); text-align: center; }
   .sched-cell-cat { white-space: nowrap; border-right: 1px solid var(--border); }
-  .sched-cell-day { white-space: nowrap; border-right: 1px solid var(--border); }
+  .sched-cell-day { border-right: 1px solid var(--border); }
   .sched-cell-next { white-space: nowrap; border-right: 1px solid var(--border); }
   .sched-cell-occurrences { white-space: nowrap; border-right: 1px solid var(--border); }
   .sched-cell-amount { white-space: nowrap; position: relative; border-right: 1px solid var(--border); }
 
+  .sched-line { display: block; white-space: nowrap; }
+  .sched-weekend { font-size: 12px; color: var(--text-3); }
+  .sched-table tbody tr:last-child { border-bottom: none; }
+
   .sched-row-last {
     background: var(--card) !important;
-    border-left: 4px solid #F59E0B !important;
+    border-left: 4px solid var(--pending-fill) !important;
   }
   .sched-row-last td {
-    background: rgba(245, 158, 11, 0.08) !important;
+    background: color-mix(in srgb, var(--pending-fill) var(--pending-mix), transparent) !important;
   }
 
   .sched-row-completed {
     background: var(--card) !important;
-    border-left: 4px solid #DC2626 !important;
+    border-left: 4px solid var(--debit) !important;
   }
   .sched-row-completed td {
-    background: rgba(220, 38, 38, 0.12) !important;
+    background: color-mix(in srgb, var(--debit) 10%, transparent) !important;
   }
 
   .sched-completed-label {
     font-weight: 600;
-    color: #DC2626;
+    color: var(--debit);
     font-style: italic;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .sched-row-last td {
-      background: rgba(245, 158, 11, 0.15) !important;
-    }
-    .sched-row-completed td {
-      background: rgba(220, 38, 38, 0.20) !important;
-    }
-    .sched-completed-label {
-      color: #FCA5A5;
-    }
   }
 
   .sched-cell-desc { color: var(--text-1); font-weight: 500; }
@@ -208,8 +216,8 @@
   .sched-table td.sched-cell-day { text-align: center; }
   .sched-table td.sched-cell-next { text-align: center; color: var(--text-1); }
   .sched-table td.sched-cell-occurrences { text-align: center; }
-  .sched-cell-amount { font-family: 'Fira Code', monospace; }
-  .sched-cell-actions { width: 60px; text-align: center; padding: 12px 4px; }
+  .sched-cell-amount { font-family: var(--font-mono); }
+  .sched-cell-actions { width: 60px; text-align: center; padding: 12px 4px; white-space: nowrap; }
 
   .sched-status-switch {
     display: inline-flex;
@@ -230,13 +238,13 @@
     position: relative;
     width: 26px;
     height: 15px;
-    background: #cbd5e1;
+    background: color-mix(in srgb, var(--text-1) 22%, transparent);
     border-radius: 8px;
     flex-shrink: 0;
     transition: background 0.2s ease;
   }
   .sched-status-switch.active .sched-status-track {
-    background: #10B981;
+    background: var(--credit);
   }
   .sched-status-thumb {
     position: absolute;
@@ -276,6 +284,7 @@
     justify-content: center;
     transition: opacity 0.15s ease;
   }
+  .sched-row:focus-within .sched-cell-actions-hover,
   .sched-row:hover .sched-cell-actions-hover {
     opacity: 1;
     pointer-events: auto;
@@ -284,20 +293,25 @@
   .sched-cat-badge { background: var(--cobalt-light); color: var(--cobalt); border-radius: 4px; padding: 3px 8px; font-size: 11px; font-weight: 500; white-space: nowrap; display: inline-block; }
   .sched-freq-badge {
     font-size: 13px; padding: 5px 11px;
-    background: rgba(59, 130, 246, 0.25); border: 1px solid rgba(59, 130, 246, 0.5);
-    border-radius: 12px; color: #2563EB; font-weight: 700; font-family: 'Inter', sans-serif;
+    background: var(--cobalt-light); border: 1px solid var(--cobalt-border);
+    border-radius: 12px; color: var(--cobalt); font-weight: 500; font-family: var(--font-ui);
   }
-  .sched-amount.sched-debit { color: #DC2626; font-weight: 700; font-size: 14px; }
-  .sched-amount.sched-credit { color: #16A34A; font-weight: 700; font-size: 14px; }
+  .sched-amount.sched-debit { color: var(--debit); font-weight: 700; font-size: 14px; }
+  .sched-amount.sched-credit { color: var(--credit); font-weight: 700; font-size: 14px; }
+  .sched-remaining {
+    display: block; margin-top: 3px;
+    font-size: 11px; font-weight: 500; color: var(--text-2);
+  }
+  .sched-remaining.off { opacity: 0.55; }
   .sched-last-badge {
     font-size: 10.5px; font-weight: 600;
     padding: 2px 7px; border-radius: 20px;
-    background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E;
-    font-family: 'Inter', sans-serif;
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
+    font-family: var(--font-ui);
     cursor: default;
   }
 
-  .sched-amount { font-family: 'Fira Code', monospace; font-size: 13.5px; font-weight: 600; }
-  .sched-debit  { color: #DC2626; }
-  .sched-credit { color: #16A34A; }
+  .sched-amount { font-family: var(--font-mono); font-size: 13.5px; font-weight: 600; }
+  .sched-debit  { color: var(--debit); }
+  .sched-credit { color: var(--credit); }
 </style>

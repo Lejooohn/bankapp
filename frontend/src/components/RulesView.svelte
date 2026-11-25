@@ -24,25 +24,8 @@
   });
 </script>
 
-<div class="page-header">
-  <h1 class="page-title">{$t('Règles de catégorisation')}</h1>
-  <p class="page-meta">{account.name}</p>
-</div>
-
 {#if error}
-  <div class="error-banner">{error}</div>
+  <div class="error-banner" role="alert">{error}</div>
 {/if}
 
 <CategorizationRules {account} {categories} />
-
-<style>
-  .error-banner {
-    background: #fee;
-    border: 1px solid #fcc;
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #c00;
-    margin-bottom: 16px;
-  }
-</style>

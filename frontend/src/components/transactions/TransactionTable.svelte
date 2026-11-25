@@ -1,7 +1,8 @@
 <script lang="ts">
   import { lang, t } from '../../lib/i18n.ts';
-  import { catStyle } from '../../utils/categoryColor.js';
-  import { modeIcon, modeBadgeStyle } from '../../utils/modeIcon.js';
+  import { catDotStyle } from '../../utils/categoryColor.js';
+  import { modeColor, modeIcon } from '../../utils/modeIcon.js';
+  import Icon from '../Icon.svelte';
   import { fmtDate, fmtAmount, fmtMonthYear, getMonthKey, occurrenceLabel, sameMonthYear } from './tx-format.ts';
 
   // Operations grouped by month (collapsible, with a delete-month action).
@@ -67,16 +68,16 @@
     <table class="tx-table">
       <thead>
         <tr>
-          <th style="width:36px; padding-left:14px;">
-            <input type="checkbox" checked={allSelected} onchange={ontoggleselectall} style="cursor:pointer;" title={$t('Tout sélectionner')} />
+          <th class="tx-check">
+            <input type="checkbox" checked={allSelected} onchange={ontoggleselectall} title={$t('Tout sélectionner')} aria-label={$t('Tout sélectionner')} />
           </th>
-          <th style="width:80px;">Date</th>
-          <th style="width:36px;" title={$t('Mode')}>{$t('Mode')}</th>
-          <th>{$t('Tiers / Détails')}</th>
+          <th class="tx-col-date">{$t('Date')}</th>
+          <th class="c tx-col-mode">{$t('Mode')}</th>
+          <th class="tx-col-tiers">{$t('Tiers / Détails')}</th>
           <th>{$t('Catégorie')}</th>
           <th class="r">{$t('Montant')}</th>
-          <th class="c" style="width:48px;">{$t('Pointé')}</th>
-          <th class="tx-actions-cell">{$t('Actions')}</th>
+          <th class="c tx-col-tick">{$t('Pointé')}</th>
+          <th class="tx-actions-cell"><span class="sr-only">{$t('Actions')}</span></th>
         </tr>
       </thead>
       <tbody>
@@ -86,24 +87,23 @@
               <td colspan="8" class="month-sep-container">
                 <div class="month-sep-inner">
                   <button
-                    class="month-sep-toggle"
+                    class="btn-icon month-sep-toggle"
                     title={collapsedMonths.has(getMonthKey(tx.date)) ? $t('Dépliez le mois') : $t('Pliez le mois')}
+                    aria-label={collapsedMonths.has(getMonthKey(tx.date)) ? $t('Dépliez le mois') : $t('Pliez le mois')}
+                    aria-expanded={!collapsedMonths.has(getMonthKey(tx.date))}
                     onclick={() => onmonthtoggle(tx.date)}
                   >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class:collapsed={collapsedMonths.has(getMonthKey(tx.date))}>
-                      <path d="M6 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
+                    <span class="month-sep-chevron" class:collapsed={collapsedMonths.has(getMonthKey(tx.date))}><Icon name="chevron-down" /></span>
                   </button>
                   <span class="month-sep-label">{fmtMonthYear(tx.date, locale)}</span>
                   <span class="month-sep-count" title="{monthCounts.get(getMonthKey(tx.date)) ?? 0} {$t('opération(s)')}">{monthCounts.get(getMonthKey(tx.date)) ?? 0}</span>
                   <button
-                    class="month-sep-delete-btn"
+                    class="btn-icon danger month-sep-delete-btn"
                     title={$t('Supprimer toutes les opérations de ce mois')}
+                    aria-label={$t('Supprimer toutes les opérations de ce mois')}
                     onclick={() => onmonthdelete(tx.date)}
                   >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M2 4h10M5 4V2.5h4V4M4.5 4v7a.5.5 0 00.5.5h4a.5.5 0 00.5-.5V4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
+                    <Icon name="trash" />
                   </button>
                 </div>
               </td>
@@ -111,76 +111,64 @@
           {/if}
           {#if !collapsedMonths.has(getMonthKey(tx.date))}
           <tr class="tx-row {tx.is_reconciled ? 'is-reconciled' : 'is-pending'} {selectedIds.has(tx.id) ? 'is-selected' : ''} {flashIds.has(tx.id) ? 'flash' : ''} {tx.is_locked ? 'is-locked' : ''}">
-            <td style="padding-left:14px;">
+            <td class="tx-check">
               {#if !tx.is_locked}
-                <input type="checkbox" checked={selectedIds.has(tx.id)} onchange={() => ontoggleselect(tx.id)} style="cursor:pointer;" />
+                <input type="checkbox" checked={selectedIds.has(tx.id)} onchange={() => ontoggleselect(tx.id)} aria-label={tx.tiers || tx.description || $t('Opérations')} />
               {/if}
             </td>
             <td class="tx-date">{fmtDate(tx.date, locale)}</td>
             <td class="c" title={getTransactionTypeLabel(tx.transaction_type)}>
-              <span class="mode-badge" style={modeBadgeStyle(tx.transaction_type)}>{@html modeIcon(tx.transaction_type)}</span>
+              <span class="mode-badge" style="--mode:{modeColor(tx.transaction_type)}">{@html modeIcon(tx.transaction_type)}</span>
             </td>
             <td class="tx-tiers-cell">
+              <div class="tx-tiers">
               <div class="tx-tiers-name">
                 {tx.tiers || tx.description || '—'}
                 {#if tx.is_locked}
-                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none" class="tx-lock-icon">
-                    <title>{$t('Opération immuable')}</title>
-                    <rect x="3" y="6.5" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/>
-                    <path d="M4.5 6.5V4.5a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                  </svg>
+                  <span class="tx-lock-icon" title={$t('Opération immuable')}><Icon name="lock" /></span>
                 {/if}
                 {#if occurrenceLabel(tx, schedulesById)}
                   <span class="tx-occurrence" title={$t('Occurrences')}>{occurrenceLabel(tx, schedulesById)}</span>
                 {/if}
               </div>
               {#if tx.details}<div class="tx-tiers-sub">{tx.details}</div>{/if}
+              </div>
             </td>
             <td>
-              {#if tx.category}<span class="cat-badge" style={catStyle(tx.category)}>{tx.category}</span>{/if}
+              {#if tx.category}<span class="tx-cat" style={catDotStyle(tx.category)}>{tx.category}</span>{/if}
             </td>
             <td class="r">
-              <span class="tx-amount {parseFloat(tx.amount) >= 0 ? 'pos' : 'neg'}">{fmtAmount(tx.amount)}</span>
+              <span class="tx-amount {parseFloat(tx.amount) >= 0 ? 'pos' : 'neg'}">{fmtAmount(tx.amount, locale)}</span>
             </td>
             <td class="c">
               <button
-                class="btn-icon {tx.is_reconciled ? 'reconcile-on' : 'reconcile-pending'}"
+                class="btn-icon tick {tx.is_reconciled ? 'reconcile-on' : 'reconcile-pending'}"
                 onclick={() => onreconcile(tx)}
                 title={tx.is_reconciled ? ($t('Marquer non pointé')) : ($t('Pointer'))}
+                aria-label={$t('Pointer')}
+                aria-pressed={!!tx.is_reconciled}
               >
-                {#if tx.is_reconciled}
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="7" fill="#EFF6FF"/>
-                    <path d="M5 8l2.5 2.5 3.5-3.5" stroke="#2563EB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                {:else}
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="7" fill="rgba(245,158,11,0.12)"/>
-                    <circle cx="8" cy="8" r="6.5" stroke="#F59E0B" stroke-width="1.6" stroke-dasharray="3 2"/>
-                  </svg>
-                {/if}
+                <!-- The pen tick of a checked statement: a dashed circle until it is ticked, then ink.
+                     Round, so it never looks like the square selection checkbox. -->
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <circle class="tick-open" cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.75" stroke-dasharray="3.2 2.3" stroke-linecap="butt"/>
+                  <path class="tick-ink" d="M3.8 10.4c1.5.9 2.8 2.4 3.6 4.6C9.2 9.9 12 5.9 17.2 2.4" pathLength="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
               </button>
             </td>
             <td class="tx-actions-cell">
               <div class="tx-actions">
                 {#if !tx.is_locked}
-                  <button class="btn-icon edit" title={$t('Modifier')} onclick={() => onedit(tx)}>
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                      <path d="M9.5 2.5L11.5 4.5L5 11H3V9L9.5 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-                    </svg>
+                  <button class="btn-icon edit" title={$t('Modifier')} aria-label={$t('Modifier')} onclick={() => onedit(tx)}>
+                    <Icon name="pencil" />
                   </button>
                 {/if}
-                <button class="btn-icon duplicate" title={$t('Dupliquer')} onclick={() => onduplicate(tx)}>
-                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                    <rect x="4" y="4" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.4"/>
-                    <path d="M2 10V3a1 1 0 011-1h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                  </svg>
+                <button class="btn-icon duplicate" title={$t('Dupliquer')} aria-label={$t('Dupliquer')} onclick={() => onduplicate(tx)}>
+                  <Icon name="copy" />
                 </button>
                 {#if !tx.is_locked}
-                  <button class="btn-icon danger" title={$t('Supprimer')} onclick={() => ondelete(tx.id)}>
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                      <path d="M2 4h10M5 4V2.5h4V4M4.5 4v7a.5.5 0 00.5.5h4a.5.5 0 00.5-.5V4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
+                  <button class="btn-icon danger" title={$t('Supprimer')} aria-label={$t('Supprimer')} onclick={() => ondelete(tx.id)}>
+                    <Icon name="trash" />
                   </button>
                 {/if}
               </div>
@@ -190,7 +178,7 @@
         {/each}
       </tbody>
     </table>
-    {#if isLoading}<div class="state-loading">Chargement…</div>{/if}
+    {#if isLoading}<div class="state-loading">{$t('Chargement…')}</div>{/if}
     {#if hasMore && !isSearchActive}
       <div style="padding:12px; text-align:center;">
         <button class="btn btn-ghost" onclick={onloadmore}>{$t('Charger plus')}</button>
@@ -200,184 +188,162 @@
 </div>
 
 <style>
+  .tx-check { width: 44px; padding-left: 16px !important; }
+  /* Selection stays in the background: the tick column is the one to read */
+  .tx-check input { display: block; width: 16px; height: 16px; cursor: pointer; opacity: 0.35; transition: opacity 120ms var(--ease); }
+  .tx-table tr:hover .tx-check input,
+  .tx-check input:checked,
+  .tx-check input:focus-visible { opacity: 1; }
+  @media (hover: none) { .tx-check input { opacity: 1; } }
+  .tx-col-date { width: 96px; }
+  .tx-col-mode { width: 56px; }
+  .tx-col-tick { width: 72px; }
+
   .mode-badge {
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
-    font-size: 13px;
-    line-height: 1;
+    vertical-align: middle;
+    /* Pulled towards the text color: readable in both themes, whatever the hue */
+    color: color-mix(in oklab, var(--mode) var(--icon-mix), var(--text-1));
   }
   .mode-badge :global(svg) {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
   }
+  .mode-badge :global(svg *) { vector-effect: non-scaling-stroke; }
+
+  /* Category: a chip in its own color, the same one as its dot in Statistics */
+  .tx-cat {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--dot) 15%, transparent);
+    font-size: 13px;
+    line-height: 24px;
+    color: color-mix(in oklab, var(--dot) var(--label-mix), var(--text-1));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
+
+  /* The date follows the state: full strength while pending, secondary once ticked */
+  .tx-row .tx-date { color: var(--text-2); }
+  .tx-row.is-pending .tx-date { color: var(--text-1); }
+
+  .tx-row .tx-tiers-sub { color: var(--text-2); }
 
   /* ── Reconciliation states ─────────────────────────────────────────────── */
 
-  /* Pending = needs attention → amber left accent + very light tint */
-  .tx-row.is-pending td:first-child {
-    box-shadow: inset 3px 0 0 #F59E0B;
-  }
-  .tx-row.is-pending {
-    background: rgba(245, 158, 11, 0.13);
-  }
-  .tx-row.is-pending:hover {
-    background: rgba(245, 158, 11, 0.21) !important;
-  }
-  :global([data-theme="dark"]) .tx-row.is-pending {
-    background: rgba(251, 191, 36, 0.17);
-  }
-  :global([data-theme="dark"]) .tx-row.is-pending:hover {
-    background: rgba(251, 191, 36, 0.27) !important;
-  }
+  /* Pending: amber edge, light amber row and amber circle, the color of the "À pointer" balance.
+     Ticked operations have no background; both keep readable text. */
+  .tx-row.is-pending { background: color-mix(in srgb, var(--pending-fill) var(--pending-mix), transparent); }
+  .tx-row.is-pending:hover { background: color-mix(in srgb, var(--pending-fill) calc(var(--pending-mix) * 1.6), transparent); }
+  .tx-row.is-pending .tx-check { box-shadow: inset 3px 0 0 var(--pending-fill); }
+  .tick.reconcile-pending { color: var(--pending); }
 
-  /* Reconciled = done → muted text so pending rows pop */
-  .tx-row.is-reconciled .tx-date,
-  .tx-row.is-reconciled .tx-tiers-name,
-  .tx-row.is-reconciled .tx-tiers-sub {
-    opacity: 0.5;
-  }
-  .tx-row.is-reconciled .tx-amount {
-    opacity: 0.6;
-  }
-  :global([data-theme="dark"]) .tx-row.is-reconciled .tx-amount {
-    /* On dark backgrounds, 0.6 opacity muddies --credit/--debit into low-contrast colors. */
-    opacity: 0.85;
-  }
-  .tx-row.is-reconciled .cat-badge {
-    opacity: 0.9;
-  }
+  .tx-row.is-pending .tx-tiers-name { font-weight: 600; }
 
-  .tx-row.is-selected { background: var(--cobalt-light) !important; }
-  .tx-row.is-selected td { border-bottom-color: var(--cobalt-border); }
+  .tick.reconcile-on { color: var(--cobalt); }
+  .tick svg { overflow: visible; }
+  .tick-open { transition: opacity 150ms var(--ease); }
+  .tick-ink {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0;
+    transition: stroke-dashoffset 180ms var(--ease), opacity 60ms linear;
+  }
+  .tick.reconcile-on .tick-open { opacity: 0; }
+  .tick.reconcile-on .tick-ink { stroke-dashoffset: 0; opacity: 1; }
+
+  /* Selection is blue and comes after pending, so it wins on a pending row */
+  .tx-row.is-selected,
+  .tx-row.is-selected:hover { background: var(--cobalt-light); }
+  .tx-row.is-selected .tx-check { box-shadow: inset 3px 0 0 var(--cobalt); }
 
   /* Locked = immutable initial-balance row */
   .tx-lock-icon {
-    vertical-align: -1px;
+    display: inline-flex;
+    vertical-align: -3px;
     margin-left: 4px;
-    opacity: 0.55;
+    color: var(--text-3);
   }
-  .tx-row.is-locked .tx-tiers-name {
-    font-style: italic;
-  }
+  .tx-row.is-locked .tx-tiers-name { color: var(--text-2); }
 
   /* Scheduled operation with a known end: progress "n/N" like the Échéancier column */
-  /* Solid cobalt chip: readable on pending (amber) and selected rows, in both themes */
+  /* Opaque tint of the accent, so it stays blue on pending (amber) and selected rows too */
   .tx-occurrence {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 7px;
+    margin-left: 8px;
+    padding: 0 6px;
     border: 1px solid var(--cobalt-border);
-    border-radius: 999px;
-    background: var(--cobalt-light);
-    font-size: 11.5px;
-    font-weight: 600;
-    line-height: 1.5;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--cobalt) 10%, var(--card));
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
     color: var(--cobalt);
-    vertical-align: 1px;
     white-space: nowrap;
   }
 
   /* ── New/edited row flash ──────────────────────────────────────────────── */
   @keyframes tx-flash {
-    from { background: rgba(102, 126, 234, 0.35); }
-    to { background: transparent; }
+    from { background: var(--cobalt-dim); }
   }
   .tx-row.flash {
     animation: tx-flash 1.6s ease-out;
   }
 
-  .month-sep-row {
-    background: var(--bg);
-    height: 60px;
-    position: relative;
-  }
-  .month-sep-row td {
-    padding: 0;
-    border: none;
-  }
+  /* ── Month line ────────────────────────────────────────────────────────── */
+  .month-sep-row { background: var(--surface); }
   .month-sep-container {
     padding: 0;
-    background: transparent;
-    border: none;
+    border-bottom: 1px solid var(--border);
   }
   .month-sep-inner {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 60px;
+    gap: 8px;
+    height: 40px;
+    padding: 0 12px 0 10px;
     white-space: nowrap;
   }
   .month-sep-label {
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #7EC8FF;
-    font-family: 'Inter', sans-serif;
-    white-space: nowrap;
-    flex-shrink: 0;
-    background: var(--card);
-    padding: 8px 20px;
-    border-radius: 20px;
-    border: 1px solid #7EC8FF;
-  }
-  .month-sep-count {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-2);
-    font-family: 'Inter', sans-serif;
-    white-space: nowrap;
-    flex-shrink: 0;
-    background: var(--bg-2);
-    padding: 4px 10px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-  }
-  .month-sep-delete-btn {
-    background: none;
-    border: none;
-    color: var(--text-3);
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-left: auto;
-    transition: color 0.2s ease;
-  }
-  .month-sep-delete-btn:hover {
-    color: #EF4444;
-  }
-
-  .month-sep-toggle {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-2);
-    flex-shrink: 0;
-    transition: color 0.2s ease, transform 0.2s ease;
-  }
-
-  .month-sep-toggle:hover {
+    margin-left: 10px;
+    font-size: 14px;
+    font-weight: 500;
     color: var(--text-1);
   }
+  .month-sep-count {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .month-sep-delete-btn { margin-left: auto; }
 
-  .month-sep-toggle svg {
-    transition: transform 0.2s ease;
+  .month-sep-chevron {
+    display: flex;
+    transition: transform 160ms var(--ease);
+  }
+  .month-sep-chevron.collapsed { transform: rotate(-90deg); }
+
+  /* Wide screens: details sit beside the third party on their own line of sight, so every operation
+     fits on one line and more of them are visible. */
+  .tx-scroll { container-type: inline-size; }
+  @container (min-width: 1400px) {
+    .tx-col-tiers { width: 46%; }
+    .tx-tiers-cell { max-width: 0; }
+    .tx-tiers {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      column-gap: 24px;
+      align-items: center;
+    }
+    .tx-row .tx-tiers-sub { font-size: 14px; line-height: 20px; }
+    .tx-row td { height: 40px; padding-top: 0; padding-bottom: 0; }
   }
 
-  .month-sep-toggle svg.collapsed {
-    transform: rotate(-90deg);
+  /* Narrow screens: tighter cells, the table scrolls sideways in its panel */
+  @media (max-width: 860px) {
+    .tx-table th, .tx-table td { padding-left: 8px; padding-right: 8px; }
   }
 </style>

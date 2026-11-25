@@ -71,6 +71,10 @@ export function buildStagingScript(
     parts.push(`CREATE TABLE ${s}.${table} (LIKE public.${table});`);
     parts.push(`COPY ${s}.${table} (${block.columns.join(', ')}) FROM stdin;`);
     parts.push(block.dataLines + '\\.');
+    // Dumps older than the deleted_at column: an inactive rule was a deleted one, it must stay hidden.
+    if (table === 'categorization_rules' && !block.columns.includes('deleted_at')) {
+      parts.push(`UPDATE ${s}.${table} SET deleted_at = NOW() WHERE active = false;`);
+    }
   }
 
   // Trailing newline is required: psql's COPY-from-stdin parser only

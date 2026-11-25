@@ -10,10 +10,10 @@ import budgetsRoute from './routes/budgets.js';
 import { sweepAndEncryptAutoBackups } from './services/backup-auto-encrypt.js';
 import { getWalGap } from './services/wal-monitor.js';
 import { retryUntilSuccess } from './services/retry.js';
-import { getParisDateParts, computeTriggerDate } from '@bankapp/shared';
+import { getParisDateParts, computeTriggerDate, formatLocalDate } from '@bankapp/shared';
 import { hashTokenForStorage, errMsg } from './lib/shared.js';
 import { securityHeaders, parseTrustProxyHops } from './lib/security-headers.js';
-import { generateNextMonthForAccount } from './services/schedule-generate.js';
+import { generateNextMonthForAccount, deactivateEndedSchedules } from './services/schedule-generate.js';
 import backupStatusRouter from './routes/backup-status.js';
 import authRouter from './routes/auth.js';
 import meRouter from './routes/me.js';
@@ -150,10 +150,27 @@ app.use(statsRouter);
 
 export { app };
 
+// Today in Europe/Paris, whatever the server timezone is.
+function parisToday(): string {
+  const { year, month, day } = getParisDateParts(new Date());
+  return formatLocalDate(new Date(year, month, day));
+}
+
+async function runDeactivateEndedSchedules() {
+  try {
+    const count = await deactivateEndedSchedules(parisToday());
+    if (count > 0) console.log(`[schedules] deactivated ${count} ended schedule(s)`);
+  } catch (err) {
+    console.error('[schedules] deactivating ended schedules failed:', errMsg(err));
+  }
+}
+
 // ── Cron jobs ─────────────────────────────────────────────────────────────────
 
 if (process.env.NODE_ENV !== 'test') {
   cron.schedule('0 0 * * *', async () => {
+    await runDeactivateEndedSchedules();
+
     const { year, month, day } = getParisDateParts(new Date());
     const triggerDate = computeTriggerDate(year, month);
 
@@ -213,7 +230,8 @@ if (process.env.NODE_ENV !== 'test') {
   retryUntilSuccess(initDB, 5000, (err, attempt) => {
     console.error(`[boot] database not ready (attempt ${attempt}):`, errMsg(err));
   })
-    .then(() => {
+    .then(async () => {
+      await runDeactivateEndedSchedules();
       app.listen(PORT, '0.0.0.0', () => {
         console.log(`✅ Server running on port ${PORT}`);
 

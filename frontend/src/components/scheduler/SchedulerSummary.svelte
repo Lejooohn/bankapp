@@ -48,10 +48,10 @@
   .sched-stat-sep { width: 1px; height: 50px; background: var(--border); }
   .sched-stat-label {
     font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--text-3); font-family: 'Inter', sans-serif;
+    letter-spacing: 0.1em; color: var(--text-3); font-family: var(--font-ui);
   }
-  .sched-stat-count { font-size: 12px; color: var(--text-2); font-family: 'Inter', sans-serif; }
-  .sched-stat-amount { font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; }
-  .sched-stat-amount.debit  { color: #DC2626; }
-  .sched-stat-amount.credit { color: #16A34A; }
+  .sched-stat-count { font-size: 12px; color: var(--text-2); font-family: var(--font-ui); }
+  .sched-stat-amount { font-size: 16px; font-weight: 700; font-family: var(--font-mono); }
+  .sched-stat-amount.debit  { color: var(--debit); }
+  .sched-stat-amount.credit { color: var(--credit); }
 </style>

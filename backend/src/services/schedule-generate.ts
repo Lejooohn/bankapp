@@ -4,7 +4,27 @@
 import pool from '../db.js';
 import { broadcastTransactionsChanged } from '../routes/events.js';
 import { ownedAccountIds } from '../lib/shared.js';
-import { parseLocalDate, formatLocalDate, scheduleTxAmount, nextOccurrenceDate, computeNextScheduleDate } from '@bankapp/shared';
+import { parseLocalDate, formatLocalDate, scheduleTxAmount, nextOccurrenceDate, occurrenceMonth } from '@bankapp/shared';
+
+// First day of the month to look at for the occurrence that follows the one dated `date`.
+export function monthAfterOccurrence(s: { day_of_month: number; skip_weekends: boolean }, date: Date): Date {
+  const month = occurrenceMonth(s, date);
+  return new Date(month.getFullYear(), month.getMonth() + 1, 1);
+}
+
+// Switches off the schedules that ended: end date in the past, or no occurrence left before it.
+// todayStr is the current day in Europe/Paris (YYYY-MM-DD).
+export async function deactivateEndedSchedules(todayStr: string): Promise<number> {
+  const { rowCount } = await pool.query(
+    `UPDATE schedules
+     SET is_active = false, is_completed = true, next_schedule_date = NULL, updated_at = NOW()
+     WHERE is_active = true
+       AND end_date IS NOT NULL
+       AND (end_date < $1::date OR next_schedule_date > end_date)`,
+    [todayStr]
+  );
+  return rowCount ?? 0;
+}
 
 // ── Schedule helper ───────────────────────────────────────────────────────────
 
@@ -124,14 +144,16 @@ export async function generateNextMonthForAccount(
 
         for (const item of toCreate) {
           const s = item.s;
-          const nextDate = computeNextScheduleDate(referenceDate, s.day_of_month, s.skip_weekends);
-          const nextDateStr = formatLocalDate(nextDate);
+          // null when no occurrence is left before end_date: the schedule is finished.
+          const nextDate = nextOccurrenceDate(s, referenceDate);
+          const nextDateStr = nextDate ? formatLocalDate(nextDate) : null;
           const startDateObj = parseLocalDate(s.start_date);
-          const occurrencesCount = (nextDate.getFullYear() - startDateObj.getFullYear()) * 12 +
-                                    (nextDate.getMonth() - startDateObj.getMonth());
+          const occurrencesCount = (referenceDate.getFullYear() - startDateObj.getFullYear()) * 12 +
+                                    (referenceDate.getMonth() - startDateObj.getMonth());
           const paymentsCompleted = (s.payments_completed || 0) + 1;
-          const isCompleted = s.expected_payments != null && occurrencesCount >= s.expected_payments;
-          const isActive = !(s.max_occurrences != null && occurrencesCount >= s.max_occurrences);
+          const isCompleted = nextDate === null
+            || (s.expected_payments != null && occurrencesCount >= s.expected_payments);
+          const isActive = !isCompleted && !(s.max_occurrences != null && occurrencesCount >= s.max_occurrences);
 
           await client.query(
             `UPDATE schedules

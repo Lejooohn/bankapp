@@ -42,7 +42,10 @@ export async function captureAccountSnapshot(
   return snapshot;
 }
 
-export async function pruneSafetySnapshots(backupDir: string, accountId: string, keep = 3): Promise<void> {
+// Snapshots kept per account (taken before each restore, or on demand).
+export const SAFETY_SNAPSHOTS_KEPT = 3;
+
+export async function pruneSafetySnapshots(backupDir: string, accountId: string, keep = SAFETY_SNAPSHOTS_KEPT): Promise<void> {
   const lastDir = path.join(backupDir, 'last');
   const files = await fs.readdir(lastDir).catch(() => [] as string[]);
   const matching = files
@@ -152,7 +155,11 @@ export async function restoreFromSafetySnapshot(
       `DELETE FROM ${table} WHERE account_id = $1 AND user_id = $2`,
       [opts.accountId, opts.userId]
     );
-    const insertResult = await insertRowsFromObjects(client, table, opts.snapshot[table]);
+    // Snapshots older than the deleted_at column: an inactive rule was a deleted one.
+    const rows = table === 'categorization_rules'
+      ? opts.snapshot[table].map(r => 'deleted_at' in r ? r : { ...r, deleted_at: r.active === false ? new Date() : null })
+      : opts.snapshot[table];
+    const insertResult = await insertRowsFromObjects(client, table, rows);
     results.push({ table, deleted: deleteResult.rowCount ?? 0, inserted: insertResult.rowCount ?? 0 });
   }
   return results;
@@ -203,8 +210,8 @@ export async function restoreToNewAccount(
 
     if (table === 'categorization_rules') {
       const r = await client.query(
-        `INSERT INTO categorization_rules (account_id, category, active, created_at, user_id, tiers_pattern, details_pattern)
-         SELECT $1, category, active, created_at, $2, tiers_pattern, details_pattern
+        `INSERT INTO categorization_rules (account_id, category, active, created_at, user_id, tiers_pattern, details_pattern, deleted_at)
+         SELECT $1, category, active, created_at, $2, tiers_pattern, details_pattern, deleted_at
          FROM ${stg}.categorization_rules
          WHERE account_id = $3 AND user_id = $2`,
         [opts.newAccountId, opts.userId, opts.sourceAccountId]

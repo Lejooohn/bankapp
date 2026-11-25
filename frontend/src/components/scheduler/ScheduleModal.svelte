@@ -72,7 +72,7 @@
     background: var(--surface);
     border-radius: 12px 12px 0 0;
   }
-  .modal-title { width: 100%; text-align: center; font-size: 14px; font-weight: 600; color: var(--text-1); font-family: 'Inter', sans-serif; }
+  .modal-title { width: 100%; text-align: center; font-size: 14px; font-weight: 600; color: var(--text-1); font-family: var(--font-ui); }
 
   .modal-body {
     flex: 1;

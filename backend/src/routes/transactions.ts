@@ -4,7 +4,7 @@ import express from 'express';
 import pool from '../db.js';
 import { broadcastTransactionsChanged } from './events.js';
 import { errMsg, normalizeString, checkAccountOwnership, isSavingsAccount } from '../lib/shared.js';
-import { transactionSchema, transferSchema, patchTransactionSchema } from '../lib/schemas.js';
+import { transactionListQuerySchema, transactionSchema, transferSchema, patchTransactionSchema } from '../lib/schemas.js';
 
 const router = express.Router();
 
@@ -14,6 +14,8 @@ router.get('/api/accounts/:id/transactions', async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
   const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
   const offset = parseInt(req.query.offset as string) || 0;
+  const query = transactionListQuerySchema.safeParse({ since: req.query.since });
+  if (!query.success) return res.status(400).json({ error: query.error.flatten().fieldErrors });
   try {
     // Verify account ownership
     if (!(await checkAccountOwnership(req.params.id, req.user.id))) {
@@ -23,8 +25,12 @@ router.get('/api/accounts/:id/transactions', async (req, res) => {
     const result = await pool.query(
       `SELECT *, COUNT(*) OVER() AS total_count
        FROM transactions WHERE account_id = $1 AND user_id = $2 AND deleted_at IS NULL
-       ORDER BY date DESC, id DESC LIMIT $3 OFFSET $4`,
-      [req.params.id, req.user.id, limit, offset]
+       ORDER BY date DESC, id DESC
+       LIMIT GREATEST($3::bigint, (
+         SELECT COUNT(*) FROM transactions
+         WHERE account_id = $1 AND user_id = $2 AND deleted_at IS NULL AND date >= $5::date
+       )) OFFSET $4`,
+      [req.params.id, req.user.id, limit, offset, query.data.since ?? null]
     );
     const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
     const data = result.rows.map(({ total_count, ...r }: any) => r);

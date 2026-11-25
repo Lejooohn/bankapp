@@ -231,3 +231,84 @@ export function nextOccurrenceDate(
   if (s.end_date && candidate > parseLocalDate(s.end_date)) return null;
   return candidate;
 }
+
+// First day of the month an occurrence dated `date` belongs to. An occurrence at the end of a
+// month can be shifted into the next one by skip_weekends: it still belongs to the month before.
+export function occurrenceMonth(s: { day_of_month: number; skip_weekends: boolean }, date: Date): Date {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const lastDayOfPrevious = new Date(year, month, 0).getDate();
+  const previous = new Date(year, month - 1, Math.min(s.day_of_month, lastDayOfPrevious));
+  const shiftedFromPrevious = shiftToBusinessDay(previous, s.skip_weekends).getTime() === date.getTime();
+  return new Date(year, shiftedFromPrevious ? month - 1 : month, 1);
+}
+
+// Rank (1-based) of the occurrence dated `date` in its schedule. Based on the month, so that an
+// operation whose day was corrected to the real bank date keeps its rank.
+export function occurrenceRank(
+  s: { day_of_month: number; frequency: string; start_date: string; skip_weekends: boolean },
+  date: Date
+): number {
+  const step = s.frequency === 'MONTHLY' ? 1 : s.frequency === 'QUARTERLY' ? 3 : s.frequency === 'BIANNUAL' ? 6 : 12;
+  const month = occurrenceMonth(s, date);
+  const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  return Math.max(1, countPeriodicOccurrences(parseLocalDate(s.start_date), monthEnd, s.day_of_month, false, step));
+}
+
+// Payments of a schedule with a known end (null without an end date): expected over its whole
+// life, completed (already inserted in the operations) and remaining. Counted from
+// next_schedule_date, so occurrences inserted ahead of time are completed, not remaining.
+export function schedulePayments(
+  s: {
+    day_of_month: number; frequency: string; start_date: string; skip_weekends: boolean;
+    end_date?: string | null; next_schedule_date?: string | null; is_completed?: boolean | null;
+  },
+  today: Date
+): { expected: number; completed: number; remaining: number } | null {
+  if (!s.end_date) return null;
+  const step = s.frequency === 'MONTHLY' ? 1 : s.frequency === 'QUARTERLY' ? 3 : s.frequency === 'BIANNUAL' ? 6 : 12;
+  const start = parseLocalDate(s.start_date);
+  const expected = countPeriodicOccurrences(start, parseLocalDate(s.end_date), s.day_of_month, s.skip_weekends, step);
+  if (s.is_completed) return { expected, completed: expected, remaining: 0 };
+
+  let before: number;
+  if (s.next_schedule_date) {
+    // Every occurrence of the months before the next one. Unshifted days: an occurrence moved
+    // into the next month by skip_weekends still counts in its own month.
+    const month = occurrenceMonth(s, parseLocalDate(s.next_schedule_date));
+    const lastDayBefore = new Date(month.getFullYear(), month.getMonth(), 0);
+    before = countPeriodicOccurrences(start, lastDayBefore, s.day_of_month, false, step);
+  } else {
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    before = countPeriodicOccurrences(start, yesterday, s.day_of_month, s.skip_weekends, step);
+  }
+  const completed = Math.min(before, expected);
+  return { expected, completed, remaining: expected - completed };
+}
+
+export interface ScheduleTotals { debits: number; credits: number; totalDebit: number; totalCredit: number }
+
+// Number and amount of the active, unfinished schedules due in the next month to come: the month
+// of the earliest next_schedule_date, kept within the current year (December once next year is
+// all that is left) and never before the current month.
+export function nextMonthScheduleTotals(schedules: any[], today: Date): ScheduleTotals {
+  const totals: ScheduleTotals = { debits: 0, credits: 0, totalDebit: 0, totalCredit: 0 };
+  const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
+  const december = new Date(today.getFullYear(), 11, 1).getTime();
+  const active = schedules.filter(s => s.is_active && !s.is_completed);
+  const nextDates = active
+    .filter(s => s.next_schedule_date)
+    .map(s => Math.max(currentMonth, parseLocalDate(s.next_schedule_date).getTime()));
+  const reference = new Date(Math.min(december, ...nextDates));
+  const monthStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  const monthEnd = new Date(reference.getFullYear(), reference.getMonth() + 1, 0);
+
+  for (const s of active) {
+    const due = nextOccurrenceDate(s, monthStart);
+    if (!due || due < monthStart || due > monthEnd) continue;
+    const amount = scheduleTxAmount({ transaction_type: s.transaction_type, amount: Number(s.amount) });
+    if (amount >= 0) { totals.credits++; totals.totalCredit += amount; }
+    else { totals.debits++; totals.totalDebit -= amount; }
+  }
+  return totals;
+}

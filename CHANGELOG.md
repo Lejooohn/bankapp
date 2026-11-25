@@ -5,6 +5,86 @@ and the version follows [SemVer](https://semver.org/) (see `docs/versioning.md`)
 
 ## [Unreleased]
 
+### Upgrade notes
+- `git pull`, then `docker compose up -d --build`. The database migration runs at startup and only adds a column
+  (`categorization_rules.deleted_at`).
+- Rules that were inactive before the upgrade stay hidden: up to 1.1.0, disabling a rule and deleting it were the
+  same thing. Create the ones you still want again.
+- If you had changed `SCHEDULE` or `BACKUP_KEEP_*` in `docker-compose.yml`, set your values in the `x-backup-policy`
+  block at the top of the file.
+
+### Added
+- Backups: the dialog lists every level (daily, weekly, monthly, manual, before a server restore), each with the
+  policy applied to it, the next scheduled backup, and a warning when a nightly backup was missed. Every level can
+  be downloaded and restored; weekly and monthly dumps cannot be deleted by hand.
+- Backups: delete all manual backups at once, with a typed confirmation
+  (`POST /api/backup/manual/delete-bulk`). Only the backups listed when the dialog opened are deleted.
+- `GET /api/accounts/:id/transactions` accepts `since` (`YYYY-MM-DD`): the page holds every operation from that day.
+- Scheduler: a schedule with a known end shows its remaining amount and number of occurrences under its
+  amount (occurrences not inserted in the operations yet).
+
+### Changed
+- Sidebar and Operations screen redesigned: neutral surfaces with a single blue accent, IBM Plex type, one
+  icon set, equal row heights, readable secondary text. A pending operation keeps a light amber row with a
+  dashed circle, a ticked one shows a pen tick. Debits are red and credits green; each balance wears
+  the color of its state (blue ticked, amber pending, green or red final), the occurrence count (2/3) is
+  blue. The trash button turns red when it holds operations.
+- Operation amounts follow the interface language (2 647,73 € in French, €2,647.73 in English).
+- Operations: the current month is open by default, even when operations of a later month exist; it used to
+  be the newest month.
+- Sidebar: each account is a block in the color of its type (blue checking, green savings, violet investment),
+  and the menu of the open account hangs inside it.
+- Operations list: third parties at full strength on every row, payment modes and categories in their color,
+  the date at full strength while the operation is pending.
+- Categories: a card per category with its color, number of operations and share of use; sort by name or by
+  use. Deleting asks in the app's own dialog.
+- Categorization rules: grouped by category, with the conditions spelled out (or / and), a search, errors shown
+  on the page, and a confirmation before deleting a rule.
+- Category labels follow the theme everywhere (scheduler, budgets, pickers, rule dialogs).
+- Light theme: soft blue-grey and ink instead of white and black, calmer colors, also in the scheduler and charts.
+- Small screens: the sidebar folds into a menu button.
+- Wide screens: the content uses the whole window (up to 2400 px), operations fit on one line with their
+  details beside the third party, and the statistics stand on one row.
+- Statistics: one main chart (expenses in the accent, income in neutral); the two pie charts become ranked
+  lists with thin bars, each with its share.
+- Fonts are bundled with the app and the Content-Security-Policy allows no external host: pages no longer
+  call Google Fonts.
+- Operations: the whole current year is loaded, with only the current month open. Months hidden by a filter keep
+  their folded state, and "select all" takes the unfolded rows (or every search result) only.
+- Backups dialog redesigned: one tile per kind of backup with its color, retention shown as pips (filled: backups
+  present, empty: places left), each backup led by its date. Account snapshots are called "go back before a
+  restore" and only shown when there are some.
+- The backup policy is set once (`x-backup-policy` in `docker-compose.yml`) and given to both the backup sidecar and
+  the API.
+- A schedule is switched to inactive when its last occurrence is inserted, or once its end date has
+  passed (checked at startup and every night). Extending its end date switches it back on.
+
+### Fixed
+- Backups: delete, download and restore work on the dumps the dialog lists. The list read `daily/` and `manual/`,
+  but the three actions only looked in `last/` and refused the names of the scheduled dumps.
+- The restore dialog opened behind the Backups dialog, and its English version asked for RESTORE while only
+  RESTAURER was accepted.
+- Restoring an account snapshot no longer asks which data to restore: the choice was ignored.
+- Disabling a categorization rule no longer deletes it: it stays in the list and can be enabled again. Deletion
+  has its own `deleted_at` column; rules already inactive stay hidden, also when an older backup is restored.
+- Creating a rule identical to a deleted one works again (it was refused as a duplicate).
+- The statistics chart follows a theme or language change right away.
+- The scheduler table no longer widens the page; below its minimum width it scrolls in its own frame.
+- Toggling a schedule active/inactive no longer clears its details, category, end date and transfer
+  target: `PATCH /api/schedules/:id` keeps the fields that are not sent, and validates its input.
+- The next occurrence after an insertion follows the schedule's frequency, day and end date.
+- Operations show their own rank in the schedule (1/3, 2/3, 3/3) instead of its overall progress.
+- The scheduler totals no longer drop to zero when every next occurrence is in the following year: they
+  cover the active, unfinished schedules due in the next month to come, within the current year.
+- The Occurrences column counts the payments of quarterly, semi-annual and annual schedules from the day
+  of the month, not from the start day, and end-of-month schedules no longer skip short months. The
+  last-occurrence badge uses the same count.
+- Creating a quarterly, semi-annual or annual schedule that already started sets its next occurrence from
+  its frequency (it was always the next month).
+
+### Removed
+- `counts` in the response of `GET /api/backup/status` (replaced by `policy`, `nextRun` and `automatic`).
+
 ## [1.1.0] - 2026-11-16
 
 ### Added

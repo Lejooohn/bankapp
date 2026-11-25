@@ -49,7 +49,8 @@ What a user can do in BankApp, screen by screen. The README has the short list a
 
 - Any user can snapshot their account data and restore it later (safety snapshots are created before a restore).
 - A restore goes either into the current account (replacing the chosen data) or into a new account.
-- Admins can create, list, download and delete full database backups.
+- Admins can create, list, download, restore and delete full database backups. The dialog lists every level
+  (daily, weekly, monthly, manual, before a server restore) and states the policy applied to each.
 - Full-database restores are admin only.
 
 ## Security

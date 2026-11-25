@@ -117,5 +117,12 @@ export function categoryColor(name) {
 export function catStyle(name) {
   const c = categoryColor(name);
   if (!c) return '';
-  return `background: ${c.bg}; border: 1px solid ${c.border}; color: ${c.text};`;
+  // Tinted with the category color and pulled towards the text color: readable in both themes
+  return `background: color-mix(in srgb, ${c.solid} 15%, transparent); border: 1px solid transparent; color: color-mix(in oklab, ${c.solid} var(--label-mix), var(--text-1));`;
+}
+
+// Quiet variant for dense lists: a status dot in the category color next to plain text.
+export function catDotStyle(name) {
+  const c = categoryColor(name);
+  return c ? `--dot: ${c.solid};` : '';
 }

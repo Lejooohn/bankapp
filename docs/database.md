@@ -16,7 +16,7 @@ in an immutable function for indexes).
 | `accounts` | Bank accounts (checking, savings, investment) | `user_id` |
 | `transactions` | Operations. Soft-deleted through `deleted_at`, never hard-deleted by the app | `account_id`, `user_id` |
 | `categories` | Categories per account | `account_id`, `user_id` |
-| `categorization_rules` | Tier and detail patterns that assign categories | `account_id`, `user_id` |
+| `categorization_rules` | Tier and detail patterns that assign categories; `active` switches a rule off, `deleted_at` hides it | `account_id`, `user_id` |
 | `schedules` | Recurring operations and their next occurrence | `account_id`, `user_id` |
 | `budgets` | Monthly budgets per category | `account_id`, `user_id` |
 | `backups` | Legacy. Nothing writes it any more; the admin route only deletes rows from it. The backup inventory is read from the files in `BACKUP_DIR` | — |

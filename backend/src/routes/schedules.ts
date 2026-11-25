@@ -3,12 +3,22 @@ import express from 'express';
 
 import pool from '../db.js';
 import { broadcastTransactionsChanged } from './events.js';
-import { parseLocalDate, formatLocalDate, scheduleTxAmount, computeTriggerDate, nextOccurrenceDate, computeNextScheduleDate, countPeriodicOccurrences, shiftToBusinessDay, addMonths } from '@bankapp/shared';
+import { parseLocalDate, formatLocalDate, scheduleTxAmount, computeTriggerDate, nextOccurrenceDate, schedulePayments } from '@bankapp/shared';
 import { errMsg, checkAccountOwnership, ownedAccountIds } from '../lib/shared.js';
-import { scheduleSchema } from '../lib/schemas.js';
-import { generateNextMonthForAccount } from '../services/schedule-generate.js';
+import { scheduleSchema, patchScheduleSchema } from '../lib/schemas.js';
+import { generateNextMonthForAccount, monthAfterOccurrence } from '../services/schedule-generate.js';
 
 const router = express.Router();
+
+// Adds the payment counts of a schedule with a known end, computed from its dates.
+function withPayments(schedule: any) {
+  const payments = schedulePayments(schedule, new Date());
+  return {
+    ...schedule,
+    expected_payments: payments?.expected || schedule.expected_payments,
+    payments_completed: payments ? payments.completed : schedule.payments_completed || 0,
+  };
+}
 
 // ── Schedules ─────────────────────────────────────────────────────────────────
 
@@ -19,67 +29,7 @@ router.get('/api/accounts/:id/schedules', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const result = await pool.query('SELECT * FROM schedules WHERE account_id = $1 AND user_id = $2 ORDER BY description ASC', [req.params.id, req.user.id]);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Calculate payments_completed dynamically for each schedule
-    const schedules = result.rows.map(schedule => {
-      let paymentsCompleted = 0;
-      let expectedPayments = 0;
-
-      if (schedule.end_date && schedule.start_date) {
-        const startDate = parseLocalDate(schedule.start_date);
-        const endDate = parseLocalDate(schedule.end_date);
-        const nextScheduleDate = schedule.next_schedule_date ? parseLocalDate(schedule.next_schedule_date) : null;
-
-        // Calculate expected_payments
-        if (schedule.frequency === 'MONTHLY') {
-          expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 1);
-          // Count occurrences already completed (up to but not including next_schedule_date)
-          const countUpTo = nextScheduleDate || today;
-          let current = new Date(startDate.getFullYear(), startDate.getMonth(), schedule.day_of_month);
-          current.setHours(0, 0, 0, 0);
-          if (current < startDate) current.setMonth(current.getMonth() + 1);
-          while (current < countUpTo) {
-            if (shiftToBusinessDay(current, schedule.skip_weekends) < countUpTo) paymentsCompleted++;
-            current.setMonth(current.getMonth() + 1);
-          }
-        } else if (schedule.frequency === 'QUARTERLY') {
-          expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 3);
-          const countUpTo = nextScheduleDate || today;
-          let current = new Date(startDate);
-          current.setHours(0, 0, 0, 0);
-          while (current < countUpTo) {
-            if (shiftToBusinessDay(current, schedule.skip_weekends) < countUpTo) paymentsCompleted++;
-            current.setMonth(current.getMonth() + 3);
-          }
-        } else if (schedule.frequency === 'BIANNUAL') {
-          expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 6);
-          const countUpTo = nextScheduleDate || today;
-          let current = new Date(startDate);
-          current.setHours(0, 0, 0, 0);
-          while (current < countUpTo) {
-            if (shiftToBusinessDay(current, schedule.skip_weekends) < countUpTo) paymentsCompleted++;
-            current.setMonth(current.getMonth() + 6);
-          }
-        } else if (schedule.frequency === 'ANNUAL') {
-          expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 12);
-          const countUpTo = nextScheduleDate || today;
-          let current = new Date(startDate);
-          current.setHours(0, 0, 0, 0);
-          while (current < countUpTo) {
-            if (shiftToBusinessDay(current, schedule.skip_weekends) < countUpTo) paymentsCompleted++;
-            current.setFullYear(current.getFullYear() + 1);
-          }
-        }
-      }
-
-      return {
-        ...schedule,
-        expected_payments: expectedPayments || schedule.expected_payments,
-        payments_completed: paymentsCompleted || schedule.payments_completed || 0
-      };
-    });
+    const schedules = result.rows.map(withPayments);
 
     res.json(schedules);
   } catch (err: any) { res.status(500).json({ error: errMsg(err) }); }
@@ -108,19 +58,9 @@ router.post('/api/accounts/:id/schedules', async (req, res) => {
     // Use the later of today or start_date as reference
     const referenceDate = startDateObj > today ? startDateObj : today;
 
-    // Calculate first occurrence on or after referenceDate
-    const nextScheduleDate = computeNextScheduleDate(referenceDate, day_of_month, skip_weekends);
-
-    // Check if next occurrence exceeds end_date; if so, don't set it
-    let nextScheduleDateStr: string | null = null;
-    if (end_date) {
-      const endDateObj = parseLocalDate(end_date);
-      if (nextScheduleDate <= endDateObj) {
-        nextScheduleDateStr = formatLocalDate(nextScheduleDate);
-      }
-    } else {
-      nextScheduleDateStr = formatLocalDate(nextScheduleDate);
-    }
+    // First occurrence on or after referenceDate, following the frequency; null past end_date.
+    const nextScheduleDate = nextOccurrenceDate({ day_of_month, frequency, start_date, skip_weekends, end_date }, referenceDate);
+    const nextScheduleDateStr = nextScheduleDate ? formatLocalDate(nextScheduleDate) : null;
 
     const result = await pool.query(
       `INSERT INTO schedules (account_id, user_id, description, amount, transaction_type, category, details, frequency, start_date, end_date, max_occurrences, day_of_month, skip_weekends, target_account_id, next_schedule_date)
@@ -129,65 +69,15 @@ router.post('/api/accounts/:id/schedules', async (req, res) => {
     );
     let schedule = result.rows[0];
 
-    // Calculate expected_payments and payments_completed dynamically for response
-    let paymentsCompleted = 0;
-    let expectedPayments = 0;
-    if (schedule.end_date && schedule.start_date) {
-      const startDate = parseLocalDate(schedule.start_date);
-      const endDate = parseLocalDate(schedule.end_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (frequency === 'MONTHLY') {
-        expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 1);
-        let current = new Date(startDate.getFullYear(), startDate.getMonth(), day_of_month);
-        current.setHours(0, 0, 0, 0);
-        if (current < startDate) current.setMonth(current.getMonth() + 1);
-        while (current < today) {
-          paymentsCompleted++;
-          current.setMonth(current.getMonth() + 1);
-        }
-      } else if (frequency === 'QUARTERLY') {
-        expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 3);
-        let current = new Date(startDate);
-        current.setHours(0, 0, 0, 0);
-        while (current < today) {
-          paymentsCompleted++;
-          current.setMonth(current.getMonth() + 3);
-        }
-      } else if (frequency === 'BIANNUAL') {
-        expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 6);
-        let current = new Date(startDate);
-        current.setHours(0, 0, 0, 0);
-        while (current < today) {
-          paymentsCompleted++;
-          current.setMonth(current.getMonth() + 6);
-        }
-      } else if (frequency === 'ANNUAL') {
-        expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 12);
-        let current = new Date(startDate);
-        current.setHours(0, 0, 0, 0);
-        while (current < today) {
-          paymentsCompleted++;
-          current.setFullYear(current.getFullYear() + 1);
-        }
-      }
-    }
-
-    schedule.expected_payments = expectedPayments;
-    schedule.payments_completed = paymentsCompleted;
-    res.json(schedule);
+    res.json(withPayments(schedule));
   } catch (err: any) { res.status(500).json({ error: errMsg(err) }); }
 });
 
 router.patch('/api/schedules/:id', async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-  const { description, amount, transaction_type, category, details, frequency, start_date, end_date, day_of_month, skip_weekends, target_account_id, is_active } = req.body;
-
-  // Validate day_of_month if provided
-  if (day_of_month !== undefined && (typeof day_of_month !== 'number' || day_of_month < 1 || day_of_month > 31 || !Number.isInteger(day_of_month))) {
-    return res.status(400).json({ error: 'Le jour du mois doit être un entier entre 1 et 31' });
-  }
+  const parsed = patchScheduleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+  const { description, amount, transaction_type, category, details, frequency, start_date, end_date, day_of_month, skip_weekends, target_account_id, is_active } = parsed.data;
 
   try {
     // A transfer schedule credits another account: it must belong to the same user.
@@ -199,25 +89,26 @@ router.patch('/api/schedules/:id', async (req, res) => {
          description = COALESCE($1, description),
          amount = COALESCE($2, amount),
          transaction_type = COALESCE($3, transaction_type),
-         category = $4,
-         details = $5,
+         category = CASE WHEN $15::boolean THEN $4 ELSE category END,
+         details = CASE WHEN $16::boolean THEN $5 ELSE details END,
          frequency = COALESCE($6, frequency),
          start_date = COALESCE($7, start_date),
-         end_date = $8,
+         end_date = CASE WHEN $17::boolean THEN $8::date ELSE end_date END,
          day_of_month = COALESCE($9, day_of_month),
          skip_weekends = COALESCE($10, skip_weekends),
-         target_account_id = $12,
+         target_account_id = CASE WHEN $18::boolean THEN $12::uuid ELSE target_account_id END,
          is_active = COALESCE($14, is_active),
          updated_at = NOW()
        WHERE id = $11 AND user_id = $13 RETURNING *`,
-      [description, amount, transaction_type, category ?? null, details ?? null, frequency, start_date ?? null, end_date ?? null, day_of_month, skip_weekends, req.params.id, target_account_id ?? null, req.user.id, is_active]
+      [description, amount, transaction_type, category ?? null, details ?? null, frequency, start_date ?? null, end_date ?? null, day_of_month, skip_weekends, req.params.id, target_account_id ?? null, req.user.id, is_active,
+       category !== undefined, details !== undefined, end_date !== undefined, target_account_id !== undefined]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Schedule not found' });
 
     let schedule = result.rows[0];
 
-    // Recalculate next_schedule_date if day_of_month, start_date, skip_weekends, or end_date changed
-    const shouldRecalculate = day_of_month !== undefined || start_date !== undefined || skip_weekends !== undefined || end_date !== undefined;
+    // Recalculate next_schedule_date if frequency, day_of_month, start_date, skip_weekends, or end_date changed
+    const shouldRecalculate = frequency !== undefined || day_of_month !== undefined || start_date !== undefined || skip_weekends !== undefined || end_date !== undefined;
 
     if (shouldRecalculate) {
       const startDateObj = parseLocalDate(schedule.start_date);
@@ -231,8 +122,8 @@ router.patch('/api/schedules/:id', async (req, res) => {
       // If only day_of_month changed (not start_date or skip_weekends), use the month of
       // the existing next_schedule_date to preserve the scheduling window.
       // This prevents retroactively filling gaps in past months.
-      if (day_of_month !== undefined && start_date === undefined && skip_weekends === undefined && end_date === undefined) {
-        const nextScheduleDateObj = parseLocalDate(schedule.next_schedule_date);
+      if (day_of_month !== undefined && frequency === undefined && start_date === undefined && skip_weekends === undefined && end_date === undefined) {
+        const nextScheduleDateObj = schedule.next_schedule_date ? parseLocalDate(schedule.next_schedule_date) : null;
         if (nextScheduleDateObj && nextScheduleDateObj > today) {
           // Use the first day of the month where the next occurrence should be
           referenceDate = new Date(nextScheduleDateObj.getFullYear(), nextScheduleDateObj.getMonth(), 1);
@@ -247,80 +138,32 @@ router.patch('/api/schedules/:id', async (req, res) => {
         referenceDate = startDateObj > today ? startDateObj : today;
       }
 
-      // Use day_of_month and skip_weekends from request body, or fall back to schedule's values
-      const dom = day_of_month !== undefined ? day_of_month : schedule.day_of_month;
-      const shouldSkipWeekends = skip_weekends !== undefined ? skip_weekends : schedule.skip_weekends;
-
-      // Calculate first occurrence on or after referenceDate
-      const nextScheduleDate = computeNextScheduleDate(referenceDate, dom, shouldSkipWeekends);
-
-      // Check if next occurrence exceeds end_date; if so, don't set it
-      const finalEndDate = end_date !== undefined ? end_date : schedule.end_date;
-      let nextScheduleDateStr: string | null = null;
-      if (finalEndDate) {
-        const endDateObj = parseLocalDate(finalEndDate);
-        if (nextScheduleDate <= endDateObj) {
-          nextScheduleDateStr = formatLocalDate(nextScheduleDate);
-        }
-      } else {
-        nextScheduleDateStr = formatLocalDate(nextScheduleDate);
+      // Months are generated ahead of time: never go back to a month already inserted,
+      // otherwise editing a finished schedule would make its last occurrence due again.
+      const lastRes = await pool.query(
+        'SELECT MAX(date) AS last_date FROM transactions WHERE schedule_id = $1 AND account_id = $2 AND deleted_at IS NULL',
+        [schedule.id, schedule.account_id]
+      );
+      const lastDate = lastRes.rows[0]?.last_date;
+      if (lastDate) {
+        const afterLast = monthAfterOccurrence(schedule, parseLocalDate(lastDate));
+        if (afterLast > referenceDate) referenceDate = afterLast;
       }
 
+      // No occurrence left before end_date: the schedule is finished, so it is switched off.
+      // A finished schedule that gets occurrences again (end date extended) is switched back on.
+      const nextScheduleDate = nextOccurrenceDate(schedule, referenceDate);
+      const finished = nextScheduleDate === null;
+      const isActive = finished ? false : schedule.is_completed ? (is_active ?? true) : schedule.is_active;
+
       const updateRes = await pool.query(
-        'UPDATE schedules SET next_schedule_date = $1 WHERE id = $2 RETURNING *',
-        [nextScheduleDateStr, schedule.id]
+        'UPDATE schedules SET next_schedule_date = $1, is_completed = $2, is_active = $3 WHERE id = $4 AND user_id = $5 RETURNING *',
+        [nextScheduleDate ? formatLocalDate(nextScheduleDate) : null, finished, isActive, schedule.id, req.user.id]
       );
       schedule = updateRes.rows[0];
     }
 
-    // Calculate expected_payments and payments_completed dynamically for response
-    let paymentsCompleted = 0;
-    let expectedPayments = 0;
-    if (schedule.end_date && schedule.start_date) {
-      const startDate = parseLocalDate(schedule.start_date);
-      const endDate = parseLocalDate(schedule.end_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (schedule.frequency === 'MONTHLY') {
-        expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 1);
-        let current = new Date(startDate.getFullYear(), startDate.getMonth(), schedule.day_of_month);
-        current.setHours(0, 0, 0, 0);
-        if (current < startDate) current.setMonth(current.getMonth() + 1);
-        while (current < today) {
-          paymentsCompleted++;
-          current.setMonth(current.getMonth() + 1);
-        }
-      } else if (schedule.frequency === 'QUARTERLY') {
-        expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 3);
-        let current = new Date(startDate);
-        current.setHours(0, 0, 0, 0);
-        while (current < today) {
-          paymentsCompleted++;
-          current.setMonth(current.getMonth() + 3);
-        }
-      } else if (schedule.frequency === 'BIANNUAL') {
-        expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 6);
-        let current = new Date(startDate);
-        current.setHours(0, 0, 0, 0);
-        while (current < today) {
-          paymentsCompleted++;
-          current.setMonth(current.getMonth() + 6);
-        }
-      } else if (schedule.frequency === 'ANNUAL') {
-        expectedPayments = countPeriodicOccurrences(startDate, endDate, schedule.day_of_month, schedule.skip_weekends, 12);
-        let current = new Date(startDate);
-        current.setHours(0, 0, 0, 0);
-        while (current < today) {
-          paymentsCompleted++;
-          current.setFullYear(current.getFullYear() + 1);
-        }
-      }
-    }
-
-    schedule.expected_payments = expectedPayments;
-    schedule.payments_completed = paymentsCompleted;
-    res.json(schedule);
+    res.json(withPayments(schedule));
   } catch (err: any) { res.status(500).json({ error: errMsg(err) }); }
 });
 
@@ -761,34 +604,19 @@ router.post('/api/accounts/:id/schedules/:scheduleId/generate-single', async (re
       );
       const actualPaymentsCompleted = Math.max(occurrenceNumber, parseInt(countRes.rows[0].cnt || 0));
 
-      // Calculate next_schedule_date: simply start_date + (occurrenceNumber months)
-      const nextOccDate = addMonths(startDate, occurrenceNumber);
-
-      // Check if next occurrence exceeds end_date; if so, clear it and mark as completed
-      let nextOccStr: string | null = null;
-      let shouldMarkCompleted = s.expected_payments && actualPaymentsCompleted >= s.expected_payments;
-
-      if (s.end_date) {
-        const endDate = parseLocalDate(s.end_date);
-        if (nextOccDate > endDate) {
-          // No more occurrences — don't set next_schedule_date
-          shouldMarkCompleted = true;
-        } else {
-          nextOccStr = formatLocalDate(nextOccDate);
-        }
-      } else {
-        nextOccStr = formatLocalDate(nextOccDate);
-      }
-
-      const isCompleted = shouldMarkCompleted;
+      // Next occurrence, or none left before end_date: the schedule is then finished and switched off.
+      const nextOccDate = nextOccurrenceDate(s, monthAfterOccurrence(s, parseLocalDate(dueStr)));
+      const isCompleted = nextOccDate === null
+        || (s.expected_payments != null && actualPaymentsCompleted >= s.expected_payments);
 
       await client.query(
         `UPDATE schedules
          SET next_schedule_date = $1,
              payments_completed = $2,
-             is_completed = $3
-         WHERE id = $4`,
-        [nextOccStr, actualPaymentsCompleted, isCompleted, s.id]
+             is_completed = $3,
+             is_active = $4
+         WHERE id = $5`,
+        [nextOccDate ? formatLocalDate(nextOccDate) : null, actualPaymentsCompleted, isCompleted, !isCompleted, s.id]
       );
 
       await client.query('COMMIT');

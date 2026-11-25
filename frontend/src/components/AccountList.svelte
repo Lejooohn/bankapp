@@ -8,6 +8,7 @@
   import ProfileSwitcher from './ProfileSwitcher.svelte';
   import LanguageToggle from './LanguageToggle.svelte';
   import ThemeToggle from './ThemeToggle.svelte';
+  import Icon from './Icon.svelte';
   import BackupStatusWidget from './BackupStatusWidget.svelte';
   import { lang, t } from '../lib/i18n.ts';
   import { theme } from '../lib/theme.ts';
@@ -40,45 +41,25 @@
   let isDeleting = $state(false);
   let error = $state('');
 
-  // Money moving in/out — clearer for a transaction ledger than a plain list.
-  const ICON_TRANSACTIONS = `<path d="M2 5h8M8 5l-2-2M8 5l-2 2" stroke="#3B82F6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9H4M6 9l2-2M6 9l2 2" stroke="#3B82F6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const ICON_CATEGORIES = `<rect x="2" y="2" width="4" height="4" rx="0.5" stroke="#8B5CF6" stroke-width="1.4"/><rect x="8" y="2" width="4" height="4" rx="0.5" stroke="#8B5CF6" stroke-width="1.4"/><rect x="2" y="8" width="4" height="4" rx="0.5" stroke="#8B5CF6" stroke-width="1.4"/><rect x="8" y="8" width="4" height="4" rx="0.5" stroke="#8B5CF6" stroke-width="1.4"/>`;
-  const ICON_RULES = `<path d="M2 4l2 2 3-3M2 9l2 2 3-3M9 5h4M9 10h4" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const ICON_SCHEDULER = `<rect x="1" y="3" width="12" height="10" rx="1.5" stroke="#F59E0B" stroke-width="1.4"/><path d="M4 1v3M10 1v3M1 7h12" stroke="#F59E0B" stroke-width="1.4" stroke-linecap="round"/>`;
-  const ICON_STATISTICS = `<path d="M2 14v-4M6 14v-6M10 14v-3M14 14v-5" stroke="#06B6D4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="3" cy="3" r="0.5" fill="#06B6D4"/><circle cx="11" cy="4" r="0.5" fill="#06B6D4"/>`;
-  // Solid actuals into a dashed forecast segment — visually distinct from the Statistiques bar chart.
-  const ICON_PROJECTION = `<path d="M1 10.5L4.5 7L7 9L9.5 5.5" stroke="#EC4899" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 5.5L13 2" stroke="#EC4899" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="1.6 1.6"/><circle cx="13" cy="2" r="1.15" fill="#EC4899"/>`;
-  
-  // Budget icon - wallet with clasp, sized for the shared 14x14 nav viewBox
-  const ICON_BUDGETS = `<rect x="1" y="3.5" width="12" height="9" rx="1.5" stroke="#10B981" stroke-width="1.4"/><path d="M1 6.5h12" stroke="#10B981" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="9.5" r="1" fill="#10B981"/>`;
+  // Checking: the card. Savings: the passbook ("livret"). Investment: the curve.
+  const ACCOUNT_TYPE_ICONS = { checking: 'credit-card', savings: 'book', investment: 'trending-up' };
 
-  // Account-type avatars, sized for a 16x16 viewBox, stroke uses currentColor so the wrapper sets the tint.
-  const ACCOUNT_TYPE_META = {
-    checking: {
-      color: '#2563EB',
-      icon: `<rect x="1.5" y="4.5" width="13" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 7.2h13" stroke="currentColor" stroke-width="1.4"/>`
-    },
-    savings: {
-      color: '#10B981',
-      icon: `<circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.8v1M8 10.2v1M10.1 6.4c-.35-.6-1.1-1-2.1-1-1.25 0-2.2.62-2.2 1.5 0 2.1 4.3 1 4.3 3.1 0 .88-.95 1.5-2.2 1.5-1 0-1.75-.4-2.1-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>`
-    },
-    investment: {
-      color: '#8B5CF6',
-      icon: `<path d="M1.8 11.5l4-4.2 2.6 2.4L13 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.6 4.5h3.4v3.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`
-    }
-  };
+  function accountColor(account) {
+    const type = account?.account_type in ACCOUNT_TYPE_ICONS ? account.account_type : 'checking';
+    return `--acct: var(--acct-${type});`;
+  }
 
-  function accountMeta(account) {
-    return ACCOUNT_TYPE_META[account?.account_type] || ACCOUNT_TYPE_META.checking;
+  function accountIcon(account) {
+    return ACCOUNT_TYPE_ICONS[account?.account_type] || ACCOUNT_TYPE_ICONS.checking;
   }
 
   const navItemsBase = [
-    { id: 'transactions', frLabel: 'Opérations', icon: ICON_TRANSACTIONS },
-    { id: 'budgets', frLabel: 'Budgets', icon: ICON_BUDGETS },
-    { id: 'categories', frLabel: 'Catégories', icon: ICON_CATEGORIES },
-    { id: 'rules', frLabel: 'Règles', icon: ICON_RULES },
-    { id: 'scheduler', frLabel: 'Échéancier', icon: ICON_SCHEDULER },
-    { id: 'statistics', frLabel: 'Statistiques', icon: ICON_STATISTICS },
+    { id: 'transactions', frLabel: 'Opérations', icon: 'arrow-left-right' },
+    { id: 'budgets', frLabel: 'Budgets', icon: 'wallet' },
+    { id: 'categories', frLabel: 'Catégories', icon: 'tag' },
+    { id: 'rules', frLabel: 'Règles', icon: 'list-checks' },
+    { id: 'scheduler', frLabel: 'Échéancier', icon: 'calendar' },
+    { id: 'statistics', frLabel: 'Statistiques', icon: 'chart-column' },
   ];
 
   let navItems = $derived(navItemsBase
@@ -197,7 +178,7 @@
 <div class="brand">
   <div class="brand-icon">
     <!-- Pie chart: universal symbol for expense categories and financial analytics -->
-    <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
       <path d="M10 2A8 8 0 0 1 18 10L10 10Z" fill="white" opacity="0.95"/>
       <path d="M18 10A8 8 0 0 1 10 18L10 10Z" fill="white" opacity="0.7"/>
       <path d="M10 18A8 8 0 0 1 2 10L10 10Z" fill="white" opacity="0.5"/>
@@ -216,25 +197,20 @@
   </div>
 {/if}
 
-<button class="btn-new-account" onclick={() => (showNewModal = true)}>
-  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-    <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>
+<button class="btn btn-ghost btn-new-account" onclick={() => (showNewModal = true)}>
+  <Icon name="plus" />
   {$t('Nouveau compte')}
 </button>
 
-<nav style="flex:1; overflow-y:auto;">
+<nav class="account-nav">
   {#each accounts as account (account.id)}
+    <div class="account-group" class:active={selectedAccount?.id === account.id} style={accountColor(account)}>
     <div class="account-row {selectedAccount?.id === account.id ? 'active' : ''}">
       <button
         class="account-btn"
         onclick={() => select(account)}
       >
-        <span class="account-avatar" style="color: {accountMeta(account).color}; background: color-mix(in srgb, {accountMeta(account).color} 16%, transparent);">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            {@html accountMeta(account).icon}
-          </svg>
-        </span>
+        <span class="account-avatar"><Icon name={accountIcon(account)} /></span>
         <span class="account-info">
           <span class="account-btn-name">{account.name}</span>
           {#if account.bank_name}
@@ -246,49 +222,41 @@
         class="account-menu-btn"
         onclick={(e) => openMenu(account, e)}
         title={$t('Options')}
+        aria-label={$t('Options')}
+        aria-expanded={menuOpenFor === account.id}
         data-account-menu
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="3" r="1.5" fill="currentColor"/>
-          <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
-          <circle cx="8" cy="13" r="1.5" fill="currentColor"/>
-        </svg>
+        <Icon name="ellipsis-vertical" />
       </button>
 
       {#if menuOpenFor === account.id}
         <div class="account-dropdown" data-account-menu onclick={stopPropagation()} onkeydown={stopPropagation()} role="presentation">
           <button class="dropdown-item" onclick={() => setDefault(account)}>
-            <span style="font-size: 14px;">{account.is_default ? '⭐' : '☆'}</span>
+            <Icon name="star" filled={account.is_default} />
             {account.is_default ? $t('Compte par défaut') : $t('Définir comme défaut')}
           </button>
           <button class="dropdown-item" onclick={() => reorderAccount(account, 'up')}>
-            <span style="font-size: 14px;">↑</span>
+            <Icon name="arrow-up" />
             {$t('Déplacer vers le haut')}
           </button>
           <button class="dropdown-item" onclick={() => reorderAccount(account, 'down')}>
-            <span style="font-size: 14px;">↓</span>
+            <Icon name="arrow-down" />
             {$t('Déplacer vers le bas')}
           </button>
           <div class="dropdown-sep"></div>
           <button class="dropdown-item" onclick={() => { closeMenu(); showEditModal = true; }}>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-              <path d="M11.5 2.5L13.5 4.5L6 12H4V10L11.5 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-            </svg>
+            <Icon name="pencil" />
             {$t('Modifier le compte')}
           </button>
           {#if account.account_type !== 'savings'}
             <button class="dropdown-item" onclick={() => { closeMenu(); showImportModal = true; }}>
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1v9M4 7l4 4 4-4M2 12v1a2 2 0 002 2h8a2 2 0 002-2v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <Icon name="download" />
               {$t('Importer un CSV')}
             </button>
           {/if}
           <div class="dropdown-sep"></div>
           <button class="dropdown-item danger" onclick={() => openDeleteConfirm(account)}>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-              <path d="M2 4h12M6 4V2h4v2M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <Icon name="trash" />
             {$t('Supprimer le compte')}
           </button>
         </div>
@@ -296,36 +264,35 @@
     </div>
 
     {#if selectedAccount?.id === account.id}
-      <div style="padding: 2px 0 6px 0;">
+      <div class="subnav">
         {#each navItems as item}
           <button
-            class="subnav-btn {currentView === item.id ? 'subnav-active' : ''}"
+            class="side-row subnav-btn {currentView === item.id ? 'subnav-active' : ''}"
+            aria-current={currentView === item.id ? 'page' : undefined}
             onclick={() => changeView(item.id)}
           >
-            <svg width="17" height="17" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;">
-              {@html item.icon}
-            </svg>
-            {$t(item.label)}
+            <span class="side-row-icon"><Icon name={item.icon} /></span>
+            <span class="side-row-label">{$t(item.label)}</span>
           </button>
         {/each}
         {#if account.account_type !== 'savings'}
           <button
-            class="subnav-btn {currentView === 'projection' ? 'subnav-active' : ''}"
+            class="side-row subnav-btn {currentView === 'projection' ? 'subnav-active' : ''}"
+            aria-current={currentView === 'projection' ? 'page' : undefined}
             title={$t('Voir la projection mensuelle')}
             onclick={() => changeView('projection')}
           >
-            <svg width="17" height="17" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;">
-              {@html ICON_PROJECTION}
-            </svg>
-            {$t('Solde prévisionnel')}
+            <span class="side-row-icon"><Icon name="trending-up" /></span>
+            <span class="side-row-label">{$t('Solde prévisionnel')}</span>
           </button>
         {/if}
       </div>
     {/if}
+    </div>
   {/each}
 
   {#if accounts.length === 0}
-    <p style="font-size:12px; color:#475569; padding:10px 10px 0;">{$t('Aucun compte')}</p>
+    <p style="font-size:13px; color:var(--text-3); padding:8px 8px 0;">{$t('Aucun compte')}</p>
   {/if}
 </nav>
 
@@ -376,7 +343,7 @@
   {:else}
     <div class="modal-overlay">
       <div class="modal-box" style="width:380px;">
-        <h2 class="modal-title">⚠️ {$t('Dernière confirmation')}</h2>
+        <h2 class="modal-title">{$t('Dernière confirmation')}</h2>
         <p style="font-size:13.5px; color:var(--text-2); line-height:1.5; margin-bottom:16px;">
           {$t('Ceci est irréversible. Tapez')} <strong>"{accountToDelete.name}"</strong> {$t('pour confirmer la suppression définitive.')}
         </p>
@@ -384,7 +351,7 @@
           type="text"
           placeholder={accountToDelete.name}
           bind:value={deleteAccountInput}
-          style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-1); font-size:14px;"
+          style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-1); font-size:14px;"
           onkeydown={e => e.key === 'Enter' && confirmDelete()}
         />
         <div class="modal-footer" style="margin-top:16px;">
@@ -408,10 +375,9 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 8px 12px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 12px;
+    gap: 12px;
+    padding: 4px 8px 0;
+    margin-bottom: 16px;
   }
 
   .error-banner {
@@ -419,221 +385,188 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    background: #fee;
-    border: 1px solid #fcc;
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-size: 12.5px;
-    color: #c00;
     margin: 0 0 12px;
   }
 
   .error-banner-close {
     background: none;
     border: none;
-    color: #c00;
+    color: inherit;
     cursor: pointer;
     font-size: 16px;
     line-height: 1;
-    padding: 0 2px;
+    padding: 0 4px;
     flex-shrink: 0;
   }
 
-  .btn-new-account {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    padding: 10px 12px;
-    margin: 0 0 14px;
-    background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: 'Inter', sans-serif;
-    transition: all 0.12s;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
-  }
-
-  .btn-new-account:hover {
-    background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%);
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-    transform: translateY(-1px);
-  }
-
-  .btn-new-account:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
-  }
   .brand-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 60%, #3B82F6 100%);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #2563EB;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(37,99,235,0.30);
   }
   .brand-text {
     display: flex;
     flex-direction: column;
-    gap: 1px;
     min-width: 0;
   }
   .brand-name {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700;
-    font-size: 15px;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 20px;
     color: var(--text-1);
-    letter-spacing: -0.3px;
-    line-height: 1.2;
   }
   .brand-tag {
-    font-family: 'Inter', sans-serif;
-    font-size: 10px;
-    font-weight: 500;
+    font-size: 12px;
+    line-height: 16px;
     color: var(--text-3);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
   }
 
-  .subnav-btn {
-    display: flex; align-items: center; gap: 7px;
-    width: 100%; padding: 6px 10px 6px 22px;
-    background: none; border: none; cursor: pointer;
-    font-size: 12.5px; color: #94A3B8; text-align: left;
-    border-radius: 6px; transition: all 0.12s;
-    font-family: 'Inter', sans-serif;
+  .btn-new-account {
+    width: 100%;
+    flex-shrink: 0;
+    margin-bottom: 16px;
+    background: var(--cobalt-light);
+    border-color: var(--cobalt-border);
+    color: var(--cobalt);
   }
-  .subnav-btn:hover { background: var(--card-hover); color: var(--text-2); }
-  .subnav-active { color: var(--cobalt) !important; background: var(--cobalt-light) !important; }
+  .btn-new-account:hover { background: var(--cobalt-dim); color: var(--cobalt); }
+
+  .account-nav {
+    flex: 1;
+    min-height: 160px;
+    overflow-y: auto;
+    /* Room for the focus ring and the account menu inside the scroll box */
+    margin: 0 -4px;
+    padding: 0 4px 12px;
+  }
+
+  /* One block per account, in the color of its type. The open account holds its own menu. */
+  .account-group {
+    margin-bottom: 8px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color 150ms var(--ease), background-color 150ms var(--ease);
+  }
+  .account-group:not(.active):hover { border-color: color-mix(in srgb, var(--acct) 40%, transparent); }
+  .account-group.active {
+    border-color: color-mix(in srgb, var(--acct) 32%, transparent);
+    background: color-mix(in srgb, var(--acct) 6%, transparent);
+  }
 
   .account-row {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin-bottom: 8px;
-    padding: 5px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
-  }
-
-  .account-row:hover {
-    border-color: var(--cobalt-border);
-    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.07);
-  }
-
-  .account-row.active {
-    background: var(--cobalt-light);
-    border-color: var(--cobalt-border);
-    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.12);
-  }
-
-  .account-row::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 9px;
-    bottom: 9px;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: transparent;
-    transition: background-color 0.15s;
-  }
-
-  .account-row.active::before {
-    background: var(--cobalt);
+    height: 48px;
+    padding-right: 4px;
+    border-radius: 8px;
   }
 
   .account-btn {
-    position: relative;
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 8px;
     width: 0;
-    padding: 6px 8px;
+    height: 100%;
+    padding: 0 8px;
     background: none;
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 12.5px;
-    color: var(--text-2);
     text-align: left;
-    font-family: 'Inter', sans-serif;
-    transition: background-color 0.12s, color 0.12s;
+    font-family: var(--font-ui);
   }
-
-  .account-row:not(.active) .account-btn:hover { background: var(--card-hover); }
 
   .account-avatar {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--acct) 16%, transparent);
+    color: var(--acct);
   }
 
   .account-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
     min-width: 0;
     flex: 1;
   }
 
   .account-btn-name {
-    font-weight: 600;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
     color: var(--text-1);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    width: 100%;
   }
-
-  .account-row.active .account-btn-name { color: var(--cobalt); }
+  .account-row.active .account-btn-name { color: var(--acct); font-weight: 600; }
 
   .account-btn-bank {
-    font-size: 11px;
+    font-size: 12px;
+    line-height: 16px;
     color: var(--text-3);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    width: 100%;
-  }
-
-  :global([data-theme="dark"]) .account-btn-bank {
-    color: var(--text-2);
   }
 
   .account-menu-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     background: none;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     color: var(--text-3);
-    transition: all 0.12s;
+    transition: background-color 150ms var(--ease), color 150ms var(--ease);
   }
+  .account-menu-btn:hover { background: color-mix(in srgb, var(--text-1) 7%, transparent); color: var(--text-1); }
 
-  .account-menu-btn:hover { background: var(--card-hover); color: var(--text-2); }
+  /* The menu hangs from the account on a rail that starts under its icon. */
+  .subnav {
+    margin: 4px 0 4px 23px;
+    padding-left: 8px;
+    border-left: 1px solid color-mix(in srgb, var(--acct) 35%, transparent);
+  }
+  .subnav .side-row { padding-left: 4px; gap: 4px; }
+  .subnav .side-row-icon { color: color-mix(in srgb, var(--acct) 75%, var(--text-3)); }
+  .subnav-btn { position: relative; }
+  .subnav-btn:hover { background: color-mix(in srgb, var(--acct) 9%, transparent); }
+
+  .subnav-active,
+  .subnav-active:hover {
+    color: var(--text-1);
+    background: color-mix(in srgb, var(--acct) 16%, transparent);
+    font-weight: 500;
+  }
+  .subnav-active .side-row-icon { color: var(--acct); }
+  .subnav-active::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--acct);
+  }
 
   .account-dropdown {
     position: absolute;
@@ -641,11 +574,15 @@
     right: 0;
     z-index: 10;
     margin-top: 4px;
+    padding: 4px;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px var(--shadow-dropdown);
+    animation: menu-in 160ms var(--ease);
+  }
+  @keyframes menu-in {
+    from { opacity: 0; transform: translateY(-4px); }
   }
 
   .dropdown-item {
@@ -653,26 +590,21 @@
     align-items: center;
     gap: 8px;
     width: 100%;
-    padding: 8px 12px;
+    height: 32px;
+    padding: 0 8px;
     background: none;
     border: none;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 13px;
+    white-space: nowrap;
     color: var(--text-2);
     text-align: left;
-    font-family: 'Inter', sans-serif;
-    transition: all 0.12s;
+    font-family: var(--font-ui);
+    transition: background-color 150ms var(--ease), color 150ms var(--ease);
   }
-
-  .dropdown-item:hover {
-    background: var(--card-hover);
-    color: var(--text-1);
-  }
-
-  .dropdown-item.danger:hover {
-    background: var(--danger-bg);
-    color: var(--debit);
-  }
+  .dropdown-item:hover { background: var(--card-hover); color: var(--text-1); }
+  .dropdown-item.danger:hover { background: var(--danger-bg); color: var(--danger-text); }
 
   .dropdown-sep {
     height: 1px;
@@ -680,18 +612,6 @@
     margin: 4px 0;
   }
 
-  .btn-danger {
-    background: #DC2626;
-    color: white;
-    border: none;
-  }
-
-  .btn-danger:hover {
-    background: #B91C1C;
-  }
-
-  .btn-danger:active {
-    background: #991B1B;
-  }
-
+  .btn-danger { background: #DC2626; color: white; }
+  .btn-danger:hover { background: #B91C1C; }
 </style>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../lib/i18n.ts';
   import { untrack } from 'svelte';
+  import Icon from './Icon.svelte';
   
   // Segmented date input (JJ / MM / AAAA), replacing the native <input type="date">.
   // Each part is its own field so editing one (typing over a selection, backspacing,
@@ -166,7 +167,7 @@
     onblur={handleGroupBlur}
   />
   <button type="button" class="calendar-btn" onclick={openCalendar} title={$t('Ouvrir le calendrier')}>
-    📅
+    <Icon name="calendar" />
   </button>
   <input
     bind:this={nativeInput}
@@ -189,7 +190,7 @@
   }
   .dateinput:focus-within {
     border-color: var(--cobalt);
-    box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+    box-shadow: 0 0 0 3px var(--cobalt-dim);
   }
   .dateinput.invalid {
     border-color: rgba(220,38,38,0.4);
@@ -219,14 +220,13 @@
     background: transparent;
     cursor: pointer;
     padding: 0 4px;
-    font-size: 16px;
+    color: var(--text-3);
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.6;
-    transition: opacity 0.2s;
+    transition: color 150ms var(--ease);
   }
   .calendar-btn:hover {
-    opacity: 1;
+    color: var(--text-1);
   }
 </style>

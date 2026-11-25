@@ -267,12 +267,12 @@
   }
   .modal-title {
     font-size: 16px; font-weight: 700;
-    color: var(--text-1); font-family: 'Inter', sans-serif;
+    color: var(--text-1); font-family: var(--font-ui);
     margin: 0 0 4px;
   }
   .modal-sub {
     font-size: 12.5px; color: var(--text-3);
-    font-family: 'Inter', sans-serif; margin: 0;
+    font-family: var(--font-ui); margin: 0;
   }
   .modal-sub strong { color: var(--text-1); font-weight: 600; }
   .modal-close {
@@ -331,7 +331,7 @@
     flex-shrink: 0;
     margin-left: 12px;
     font-weight: 600;
-    font-family: 'Fira Code', monospace;
+    font-family: var(--font-mono);
     color: var(--text-1);
   }
   .tx-amount.negative {
@@ -406,7 +406,7 @@
     padding: 2px 9px;
     background: var(--chip-neutral-bg); border: 1px solid var(--chip-neutral-border);
     border-radius: 5px; font-size: 12px;
-    color: var(--text-2); font-family: 'Fira Code', monospace;
+    color: var(--text-2); font-family: var(--font-mono);
     white-space: nowrap;
     width: fit-content;
   }
@@ -438,7 +438,7 @@
   .info-box {
     display: flex; align-items: flex-start; gap: 8px;
     font-size: 11.5px; color: var(--info-text);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     background: var(--info-bg); border: 1px solid var(--info-border);
     border-radius: 7px; padding: 8px 12px;
   }

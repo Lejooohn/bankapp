@@ -14,6 +14,14 @@ describe('docker-compose.yml (production stack)', () => {
     expect(compose).not.toMatch(/- '\$\{DB_PORT/);
   });
 
+  it('gives the same backup policy to the API, which shows it, and to the sidecar, which applies it', () => {
+    const service = (name: string) => compose.match(new RegExp(`^  ${name}:\\n(?:(?:    .*)?\\n)+`, 'm'))![0];
+    for (const name of ['backend', 'backup']) expect(service(name)).toContain('<<: *backup-policy');
+    for (const key of ['SCHEDULE', 'BACKUP_KEEP_DAYS', 'BACKUP_KEEP_WEEKS', 'BACKUP_KEEP_MONTHS']) {
+      expect(compose.match(new RegExp(`^ +${key}:`, 'gm')), key).toHaveLength(1);
+    }
+  });
+
   it('publishes the API on loopback only', () => {
     expect(compose).toMatch(/- '127\.0\.0\.1:\$\{API_PORT:-3000\}:3000'/);
   });
@@ -71,6 +79,14 @@ describe('frontend/deploy/default.conf.template', () => {
     expect(csp).not.toMatch(/script-src[^;]*unsafe-(inline|eval)/);
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
+  });
+
+  it('loads nothing from another host: the fonts are bundled', () => {
+    const csp = headers.match(/Content-Security-Policy "([^"]+)"/)?.[1] ?? '';
+    expect(csp).not.toMatch(/https?:/);
+    for (const file of ['frontend/index.html', 'frontend/src/main.ts', 'frontend/src/styles/global.css']) {
+      expect(read(`${ROOT}${file}`), file).not.toMatch(/(?:url\(|import |src=|href=)\s*['"]?https?:/);
+    }
   });
 
   it('includes the security headers in every location, since add_header is not inherited', () => {

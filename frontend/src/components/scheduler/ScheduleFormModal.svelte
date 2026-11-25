@@ -113,7 +113,7 @@
     <!-- Montant et Mode -->
     <div class="field" style="margin-bottom:0;">
       <label for="s-amount">{$t('Montant')} *</label>
-      <input id="s-amount" type="number" bind:value={amount} step="0.01" placeholder="0.00" style="font-family:'Fira Code',monospace;" />
+      <input id="s-amount" type="number" bind:value={amount} step="0.01" placeholder="0.00" style="font-family:var(--font-mono);" />
     </div>
     <div class="field" style="margin-bottom:0;">
       <label for="s-type">{$t('Mode')}</label>
@@ -123,11 +123,11 @@
     <!-- Dates -->
     <div class="field" style="margin-bottom:0;">
       <label for="s-sdate">{$t('Date début')} *</label>
-      <DateInput id="s-sdate" bind:value={startDate} style="font-family:'Fira Code',monospace;" />
+      <DateInput id="s-sdate" bind:value={startDate} style="font-family:var(--font-mono);" />
     </div>
     <div class="field" style="margin-bottom:0;">
       <label for="s-edate">{$t('Date fin')}</label>
-      <DateInput id="s-edate" bind:value={endDate} style="font-family:'Fira Code',monospace;" />
+      <DateInput id="s-edate" bind:value={endDate} style="font-family:var(--font-mono);" />
     </div>
 
     <!-- Fréquence et Jour -->
@@ -207,7 +207,7 @@
     padding: 10px 12px; border: 1px solid var(--border);
     border-radius: 6px; background: var(--surface);
     color: var(--text-1); font-size: 14px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
   .field input:focus, .field select:focus {
     outline: none; border-color: #3B82F6; background: var(--card);

@@ -1,6 +1,6 @@
 // Pure helpers for the scheduler view: no component state, no API calls.
 // Calendar rules (holidays, business days, date parsing) come from @bankapp/shared.
-import { parseLocalDate as parseDay, isBusinessDay } from '@bankapp/shared';
+import { parseLocalDate as parseDay } from '@bankapp/shared';
 
 // Transaction types that credit the account (kept in sync with the backend).
 export const CREDIT_TYPES = new Set(['Versement', 'Virement reçu', 'Dépôt de chèque']);
@@ -22,73 +22,19 @@ export function formatCountdown(targetIso: string, lang: string, now: number): s
   return `${days}${dayUnit} ${hours}h ${minutes}m`;
 }
 
-// Clamp day_of_month to the last day of the target month so e.g. day 31
-// doesn't roll a 30-day month over into the next one.
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function clampedDate(year: number, month: number, dom: number): Date {
-  return new Date(year, month, Math.min(dom, daysInMonth(year, month)));
-}
-
-// Next occurrence strictly after today (or null when past end_date).
-export function nextOccurrence(s: any): Date | null {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const dom = s.day_of_month;
-  const start = parseLocalDate(s.start_date)!;
-  let candidate: Date;
-
-  if (s.frequency === 'MONTHLY') {
-    candidate = clampedDate(today.getFullYear(), today.getMonth(), dom);
-    if (candidate <= today) candidate = clampedDate(today.getFullYear(), today.getMonth() + 1, dom);
-    while (candidate < start) candidate = clampedDate(candidate.getFullYear(), candidate.getMonth() + 1, dom);
-  } else {
-    const step = s.frequency === 'QUARTERLY' ? 3 : s.frequency === 'BIANNUAL' ? 6 : 12;
-    let d = clampedDate(start.getFullYear(), start.getMonth(), dom);
-    while (d <= today) d = clampedDate(d.getFullYear(), d.getMonth() + step, dom);
-    candidate = d;
-  }
-
-  if (s.skip_weekends) {
-    // Skip to next business day (weekend + French holidays)
-    while (!isBusinessDay(candidate)) {
-      candidate.setDate(candidate.getDate() + 1);
-    }
-  }
-
-  if (s.end_date && candidate > parseLocalDate(s.end_date)!) return null;
-  return candidate;
-}
-
-// Count occurrences remaining from next occurrence to end_date (inclusive)
+// Occurrences not inserted yet, or null when the schedule has no known end. Same counts as the
+// Occurrences column, so both always agree.
 export function remainingOccurrences(s: any): number | null {
-  if (!s.end_date) return null;
-  const end = parseLocalDate(s.end_date)!;
-  const dom = s.day_of_month;
-  const step = s.frequency === 'QUARTERLY' ? 3 : s.frequency === 'BIANNUAL' ? 6 : 12;
+  if (!s.end_date || s.expected_payments == null) return null;
+  return Math.max(0, s.expected_payments - s.payments_completed);
+}
 
-  const first = nextOccurrence(s);
-  if (!first) return 0;
-
-  let count = 0;
-  let cur = new Date(first);
-
-  while (cur <= end) {
-    count++;
-    if (s.frequency === 'MONTHLY') {
-      cur = clampedDate(cur.getFullYear(), cur.getMonth() + 1, dom);
-    } else {
-      cur = clampedDate(cur.getFullYear(), cur.getMonth() + step, dom);
-    }
-    if (s.skip_weekends) {
-      // Skip to next business day (weekend + French holidays)
-      while (!isBusinessDay(cur)) {
-        cur.setDate(cur.getDate() + 1);
-      }
-    }
-  }
-  return count;
+// Amount of the occurrences not inserted yet, or null when there is nothing to show
+// (no known end, or finished). Counted in cents.
+export function remainingAmount(s: any): number | null {
+  const n = remainingOccurrences(s);
+  if (!n || s.is_completed) return null;
+  return Math.round(Math.abs(parseFloat(s.amount)) * 100) * n / 100;
 }
 
 export function fmtAmount(a: string | number, type: string): string {

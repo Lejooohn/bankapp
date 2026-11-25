@@ -212,7 +212,7 @@ export async function initDB() {
 
     // Initialize next_schedule_date from start_date
     await client.query(
-      `UPDATE schedules SET next_schedule_date = start_date WHERE next_schedule_date IS NULL`
+      `UPDATE schedules SET next_schedule_date = start_date WHERE next_schedule_date IS NULL AND is_completed IS NOT TRUE`
     );
 
     // Initialize payments_completed from occurrences_count
@@ -480,6 +480,20 @@ export async function initDB() {
     } catch (e: any) {
       // Ignore if column is already nullable or doesn't exist
       console.log('Migration warning: could not alter tiers_pattern column:', e.message);
+    }
+
+    // Deleted and switched-off rules used to share active = false. Give deletion its own column, once:
+    // every rule inactive at that moment counts as deleted (it was hidden everywhere already). The check
+    // keeps rules switched off later from being deleted at the next boot. One query string, so one transaction.
+    const ruleDeletedAt = await client.query(`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'categorization_rules' AND column_name = 'deleted_at'
+    `);
+    if (ruleDeletedAt.rows.length === 0) {
+      await client.query(`
+        ALTER TABLE categorization_rules ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+        UPDATE categorization_rules SET deleted_at = NOW() WHERE active = false;
+      `);
     }
 
     // Startup cleanup: purge soft-deleted transactions older than 30 days

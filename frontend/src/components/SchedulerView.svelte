@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, untrack } from 'svelte';
+  import { nextMonthScheduleTotals } from '@bankapp/shared';
   import { lang, t } from '../lib/i18n.ts';
   import { api } from '../lib/api.js';
   import SchedulerToolbar from './scheduler/SchedulerToolbar.svelte';
@@ -9,7 +10,7 @@
   import GenerateChoiceModal from './scheduler/GenerateChoiceModal.svelte';
   import DeleteScheduleModal from './scheduler/DeleteScheduleModal.svelte';
   import {
-    CREDIT_TYPES, formatCountdown, insertedMonthLabel, nextMonthLabel, parseLocalDate, sortValue,
+    formatCountdown, insertedMonthLabel, nextMonthLabel, sortValue,
   } from './scheduler/schedule-utils.ts';
 
   let { account, simulatedTransactions = $bindable([]) } = $props();
@@ -207,22 +208,7 @@
   let countdown = $derived(genStatus ? formatCountdown(genStatus.autoRunDate, $lang, countdownNow) : '');
   let echeanceLabel = $derived($t(schedules.length !== 1 ? 'échéances' : 'échéance'));
   // ── Stats ─────────────────────────────────────────────────────
-  let stats = $derived(schedules
-    .filter(s => {
-      if (s.end_date && new Date(s.end_date) < new Date()) return false;
-      // Only count schedules with next occurrence in current year
-      if (s.next_schedule_date) {
-        const nextDate = parseLocalDate(s.next_schedule_date)!;
-        return nextDate.getFullYear() === new Date().getFullYear();
-      }
-      return false;
-    })
-    .reduce((acc, s) => {
-      const amt = Math.abs(parseFloat(s.amount));
-      if (CREDIT_TYPES.has(s.transaction_type)) { acc.credits++; acc.totalCredit += amt; }
-      else { acc.debits++; acc.totalDebit += amt; }
-      return acc;
-    }, { debits: 0, credits: 0, totalDebit: 0, totalCredit: 0 }));
+  let stats = $derived(nextMonthScheduleTotals(schedules, new Date()));
   let debitLabel = $derived($t(stats.debits !== 1 ? 'échéances' : 'échéance'));
   let creditLabel = $derived($t(stats.credits !== 1 ? 'échéances' : 'échéance'));
   let balance = $derived(stats.totalCredit - stats.totalDebit);

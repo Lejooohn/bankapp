@@ -153,7 +153,7 @@ Rules apply to the `Tiers` (merchant) and `Details` fields. Matching is **accent
 
 The scheduler shows an interactive calendar with:
 - Upcoming occurrences highlighted
-- Completed/pending counts
+- Completed/pending counts, and the amount left to pay (or receive) when the end date is known
 - A **"Générer pour le mois prochain"** (Generate Next Month) button to auto-create transactions
 
 ### 5. Set a Budget
@@ -339,7 +339,7 @@ server {
 
 ### Backups
 
-Automated daily/weekly/monthly PostgreSQL backups run on the schedule configured on the `backup` service (default `SCHEDULE` in `docker-compose.yml`), stored under `./backups/{daily,weekly,monthly}`. A background sweep inside the backend encrypts any new plaintext dump it finds there within 15 minutes. Any authenticated user can also snapshot their own account on demand; admins can additionally create/download/delete full-database backups from the UI (stored under `./backups/last`). See **Security** below for details.
+Automated daily/weekly/monthly PostgreSQL backups run on the schedule configured on the `backup` service (default `SCHEDULE` in `docker-compose.yml`), stored under `./backups/{daily,weekly,monthly}`. A background sweep inside the backend encrypts any new plaintext dump it finds there within 15 minutes. Any authenticated user can also snapshot their own account on demand; admins can additionally create, download, restore and delete full-database backups from the UI (manual ones are stored under `./backups/manual` and kept 30 days). The Backups dialog shows every level and the policy applied, which is set once in `x-backup-policy` (`docker-compose.yml`). See **Security** below for details.
 
 `bash scripts/backup.sh` (run from the project folder) makes an extra encrypted dump in `backups/manual/`. There is no automated restore test: see `docs/RESTORE_RUNBOOK.md` to test a restore by hand.
 
@@ -479,8 +479,8 @@ docker-compose up -d --build
 # frontend/package.json (or backend/package.json), rebuild that service, or Vite cannot resolve the new package:
 #   docker-compose --env-file .env.local -f docker-compose.local.yml up -d --build frontend
 # Make changes, test locally
-cd backend && npx tsc --noEmit && npm test   # type check, then 122 Vitest tests
-cd shared && npm test                        # 27 tests: calendar and budget rules
+cd backend && npx tsc --noEmit && npm test   # type check, then 211 Vitest tests
+cd shared && npm test                        # 45 tests: calendar and budget rules
 cd frontend && npm run build                 # no frontend test runner yet; the build must pass
 ```
 
@@ -513,7 +513,7 @@ git push origin feature/my-feature
 - [ ] Real-time WebSocket sync for multi-tab updates
 - [ ] Advanced exports (QuickBooks, YNAB integration)
 - [ ] Budget alerts (notify when approaching/exceeding a budget)
-- [ ] Broader automated test coverage (the backend has 122 Vitest tests, including route tests through the real app for auth, restore and transactions; the frontend has none, only build checks)
+- [ ] Broader automated test coverage (the backend has 211 Vitest tests, including route tests through the real app for auth, restore and transactions; the frontend has none, only build checks)
 - [ ] OpenAPI/Swagger documentation
 - [ ] SSO / OAuth login (in addition to the existing username/password auth)
 - [ ] Email notifications

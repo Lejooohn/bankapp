@@ -696,7 +696,7 @@
     background: var(--card);
     color: var(--text-1);
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
   
   .input:focus {

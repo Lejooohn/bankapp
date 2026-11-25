@@ -70,5 +70,5 @@
   .about-section { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); margin: 16px 0 6px; }
   .about-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .about-table th { text-align: left; font-weight: 500; color: var(--text-2); padding: 4px 8px 4px 0; width: 45%; }
-  .about-table td { color: var(--text-1); padding: 4px 0; font-family: 'Fira Code', monospace; }
+  .about-table td { color: var(--text-1); padding: 4px 0; font-family: var(--font-mono); }
 </style>

@@ -6,11 +6,12 @@
   import ConfirmModal from './ConfirmModal.svelte';
   import ExportModal from './ExportModal.svelte';
   import CategorySelect from './CategorySelect.svelte';
+  import Icon from './Icon.svelte';
   import TransactionTrash from './transactions/TransactionTrash.svelte';
   import TransactionFilters from './transactions/TransactionFilters.svelte';
   import TransactionTable from './transactions/TransactionTable.svelte';
   import DeleteMonthModal from './transactions/DeleteMonthModal.svelte';
-  import { getMonthKey, occurrenceLabel } from './transactions/tx-format.ts';
+  import { currentMonthKey, getMonthKey, occurrenceLabel } from './transactions/tx-format.ts';
   import { lang, t } from '../lib/i18n.ts';
   import { api } from '../lib/api.js';
 
@@ -420,7 +421,8 @@
   $effect.pre(() => {
     displayed;
     untrack(() => {
-      // Manage collapsed months: preserve user toggles, add new months, remove obsolete ones
+      // Manage collapsed months: preserve user toggles, add new months. A month hidden by a search or a
+      // filter keeps its state, otherwise every month would come back open once the filter is removed.
       const monthsInOrder = [];
       const seenMonths = new Set<string>();
       for (const tx of displayed) {
@@ -437,15 +439,12 @@
       const currentCollapsed = getCollapsedMonths();
       const newCollapsed = new Set<string>(currentCollapsed);
 
-      // Remove months that no longer exist
-      for (const m of currentCollapsed) {
-        if (!seenMonths.has(m)) newCollapsed.delete(m);
-      }
-
-      // Add newly visible months to collapsed (except the first one which should be expanded by default)
-      for (let i = 1; i < monthsInOrder.length; i++) {
-        const month = monthsInOrder[i];
-        if (!knownMonths.has(month)) {
+      // Newly visible months start collapsed, except the current one. Months to come (schedules inserted
+      // ahead) stay folded above it. Without operations this month, the newest month is open instead.
+      const current = currentMonthKey();
+      const openMonth = seenMonths.has(current) ? current : monthsInOrder[0];
+      for (const month of monthsInOrder) {
+        if (month !== openMonth && !knownMonths.has(month)) {
           newCollapsed.add(month);
         }
       }
@@ -471,13 +470,18 @@
   $effect.pre(() => {
     if (account) untrack(() => loadSchedules());
   });
-  let selectableDisplayed = $derived(displayed.filter(t => !t.is_locked));
+  // "Select all" only takes the rows on screen: the list holds the whole year, mostly folded.
+  // Search results are all taken, since the search itself is the selection.
+  let selectableDisplayed = $derived(displayed.filter(t =>
+    !t.is_locked && (isSearchActive || !collapsedMonths.has(getMonthKey(t.date)))
+  ));
   let allSelected = $derived(selectableDisplayed.length > 0 && selectableDisplayed.every(t => selectedIds.has(t.id)));
   $effect.pre(() => {
     if (account) untrack(() => fetchTrashCount());
   });
   // ── Formatting ────────────────────────────────────────────────
   let currentLocale = $derived(($lang === 'fr' ? 'fr-FR' : 'en-US'));
+  let activeFilterCount = $derived(Object.entries(activeFilters).filter(([k, on]) => k !== 'text' && on).length);
   let pendingCount = $derived(allTransactions.filter(t => !t.is_reconciled).length);
 </script>
 
@@ -493,75 +497,50 @@
 <div class="tx-panel">
   <!-- Header -->
   <div class="tx-panel-header">
-    <div style="display:flex; align-items:center; gap:8px;">
+    <div class="tx-heading">
       <span class="tx-panel-title">{$t('Opérations')}</span>
-      <span class="tx-count">{displayed.length} / {totalTransactions}</span>
+      <span class="tx-count">{displayed.length.toLocaleString(currentLocale)} / {totalTransactions.toLocaleString(currentLocale)}</span>
     </div>
 
     <!-- Search bar + advanced filters toggle -->
-    <div style="display:flex; align-items:center; gap:12px; flex:1; max-width:480px;">
-      <div class="search-wrap" style="flex:1; position:relative; display:flex; align-items:center; background:var(--input-bg); border:1.5px solid var(--border); border-radius:10px; padding:0 12px; height:40px; transition:all 250ms ease;">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0; color:var(--text-3); margin-right:8px;">
-          <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6"/>
-          <path d="M11 11l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-        </svg>
-        <input type="text" bind:value={searchText} placeholder={$t('Rechercher une transaction…')} style="flex:1; border:none; background:none; outline:none; font-size:14px; color:var(--text-1);" />
+    <div class="tx-search">
+      <div class="search-wrap">
+        <Icon name="search" />
+        <input type="text" bind:value={searchText} placeholder={$t('Rechercher')} aria-label={$t('Rechercher une transaction…')} />
         {#if searchText || Object.values(activeFilters).some(Boolean)}
-          <button onclick={clearSearch} style="background:none; border:none; cursor:pointer; font-size:18px; color:var(--text-3); padding:4px; display:flex; align-items:center; justify-content:center; transition:color 200ms;">✕</button>
+          <button class="btn-icon search-clear" onclick={clearSearch} title={$t('Effacer')} aria-label={$t('Effacer')}><Icon name="x" /></button>
         {/if}
       </div>
 
       <!-- Filters button with active count (excluding text filter) -->
-      <button
-        onclick={() => (showAdvancedFilters = !showAdvancedFilters)}
-        style="padding:10px 14px; font-size:14px; font-weight:500; border:1.5px solid {showAdvancedFilters ? 'var(--accent)' : 'var(--border)'}; border-radius:10px; background:{showAdvancedFilters ? 'var(--accent)' : 'var(--bg-1)'}; color:{showAdvancedFilters ? 'white' : 'var(--text-1)'}; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:8px; transition:all 250ms ease; height:40px;"
-      >
-        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex-shrink:0;">
-          <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <circle cx="17" cy="5" r="2" fill="currentColor" opacity="0.3"/>
-          <circle cx="17" cy="10" r="2" fill="currentColor" opacity="0.3"/>
-          <circle cx="17" cy="15" r="2" fill="currentColor" opacity="0.3"/>
-        </svg>
+      <button class="btn btn-ghost" class:active={showAdvancedFilters} aria-expanded={showAdvancedFilters} onclick={() => (showAdvancedFilters = !showAdvancedFilters)}>
+        <Icon name="list-filter" />
         {$t('Filtres')}
-        {#if Object.entries(activeFilters).filter(([k]) => k !== 'text').some(([,v]) => v)}
-          <span style="background:{showAdvancedFilters ? 'rgba(255,255,255,0.4)' : 'var(--accent)'}; color:{showAdvancedFilters ? 'white' : 'white'}; padding:3px 8px; border-radius:5px; font-size:12px; font-weight:700; min-width:20px; text-align:center;">
-            {Object.entries(activeFilters).filter(([k]) => k !== 'text').filter(([,v]) => v).length}
-          </span>
-        {/if}
+        {#if activeFilterCount > 0}<span class="btn-count">{activeFilterCount}</span>{/if}
+      </button>
+      <button class="btn btn-ghost" class:active={showOnlyPending} aria-pressed={showOnlyPending} onclick={() => (showOnlyPending = !showOnlyPending)}>
+        {$t('À pointer')}
+        <span class="btn-count">{pendingCount}</span>
       </button>
     </div>
 
-    <div style="display:flex; align-items:center; gap:8px;">
-      <button class="btn btn-ghost {showOnlyPending ? 'active' : ''} {pendingCount > 0 ? 'btn-pending-items' : ''}"
-        onclick={() => (showOnlyPending = !showOnlyPending)}>
-        {$t('À pointer')} ({pendingCount})
+    <div class="tx-tools">
+      <button class="btn btn-square {trashCount > 0 ? 'btn-danger-ghost' : 'btn-ghost'}" onclick={openTrash}
+        title={trashCount > 0 ? `${$t('Corbeille')} (${trashCount})` : $t('Corbeille')}
+        aria-label={trashCount > 0 ? `${$t('Corbeille')} (${trashCount})` : $t('Corbeille')}>
+        <Icon name="trash" />
+        {#if trashCount > 0}<span class="trash-badge" aria-hidden="true">{trashCount}</span>{/if}
       </button>
-      <button class="btn btn-trash {trashCount > 0 ? 'btn-trash--items' : ''}" onclick={openTrash} title={$t('Corbeille')}>
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-          <path d="M2 4h10M5 4V2.5h4V4M4.5 4v7a.5.5 0 00.5.5h4a.5.5 0 00.5-.5V4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        {$t('Corbeille')}
-        {#if trashCount > 0}
-          <span class="trash-badge">{trashCount}</span>
-        {/if}
+      <button class="btn btn-ghost btn-square" onclick={() => (showExportModal = true)} title={$t('Exporter')} aria-label={$t('Exporter')}>
+        <Icon name="download" />
       </button>
-      <button class="btn btn-ghost" onclick={() => (showExportModal = true)} title={$t('Exporter')}>
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        {$t('Exporter')}
-      </button>
-      <button class="btn btn-primary" onclick={() => (showTransferModal = true)}>
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-          <path d="M2 7h10M9 5l3 2-3 2M5 9L2 7l3-2M7 1v4M7 9v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+      <button class="btn {account.account_type === 'savings' ? 'btn-primary' : 'btn-ghost'}" onclick={() => (showTransferModal = true)}>
+        <Icon name="arrow-left-right" />
         {$t('Transfert')}
       </button>
       {#if account.account_type !== 'savings'}
-        <button class="btn btn-primary btn-new-transaction" onclick={() => (showNewModal = true)}>
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
+        <button class="btn btn-primary" onclick={() => (showNewModal = true)}>
+          <Icon name="plus" />
           {$t('Nouvelle opération')}
         </button>
       {/if}
@@ -571,10 +550,10 @@
   <!-- Bulk action bar -->
   {#if selectedIds.size > 0}
     <div class="bulk-bar">
-      <span class="bulk-count">{selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
-      <div style="display:flex; gap:8px; align-items:center;">
+      <span class="bulk-count">{(selectedIds.size > 1 ? $t('{n} opérations sélectionnées') : $t('{n} opération sélectionnée')).replace('{n}', String(selectedIds.size))}</span>
+      <div class="bulk-actions">
         {#if !showBulkCatPicker}
-          <button class="btn btn-ghost" style="font-size:12px; padding:5px 10px;" onclick={() => (showBulkCatPicker = true)}>
+          <button class="btn btn-ghost" onclick={() => (showBulkCatPicker = true)}>
             {$t('Catégoriser…')}
           </button>
         {:else}
@@ -582,17 +561,15 @@
             <CategorySelect bind:value={bulkCatValue} categories={allCategoryNames} label={$t('Choisir…')} />
           </div>
           {#if bulkCatValue}
-            <button class="btn btn-primary" style="font-size:12px; padding:5px 10px;" onclick={bulkCategorize}>{$t('Appliquer')}</button>
+            <button class="btn btn-primary" onclick={bulkCategorize}>{$t('Appliquer')}</button>
           {/if}
-          <button class="btn btn-ghost" style="font-size:12px; padding:5px 8px;" onclick={() => (showBulkCatPicker = false)}>✕</button>
+          <button class="btn btn-ghost btn-square" onclick={() => (showBulkCatPicker = false)} title={$t('Annuler')} aria-label={$t('Annuler')}><Icon name="x" /></button>
         {/if}
-        <button class="btn bulk-delete-btn" onclick={bulkDelete}>
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-            <path d="M2 4h10M5 4V2.5h4V4M4.5 4v7a.5.5 0 00.5.5h4a.5.5 0 00.5-.5V4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+        <button class="btn btn-danger-ghost" onclick={bulkDelete}>
+          <Icon name="trash" />
           {$t('Supprimer')}
         </button>
-        <button class="btn btn-ghost" style="font-size:12px; padding:5px 8px;" onclick={clearSelection}>✕</button>
+        <button class="btn btn-ghost btn-square" onclick={clearSelection} title={$t('Fermer')} aria-label={$t('Fermer')}><Icon name="x" /></button>
       </div>
     </div>
   {/if}
@@ -661,7 +638,7 @@
 {#if showDeleteConfirm}
   <ConfirmModal
     title={$t('Supprimer l\'opération')}
-    message={$t('L\'opération sera déplacée dans la corbeille. Vous pourrez la restaurer depuis l\'icône 🗑 en haut à droite.')}
+    message={$t('L\'opération sera déplacée dans la corbeille. Vous pourrez la restaurer depuis l\'icône corbeille en haut à droite.')}
     confirmText={$t('Supprimer')} confirmClass="btn-danger-ghost"
     isLoading={isDeleting}
     on:confirm={deleteTransaction}
@@ -674,89 +651,76 @@
 {/if}
 
 <style>
-  /* Trash button — visible with amber accent when it has items */
-  .btn-trash {
+  .tx-heading {
     display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .tx-search {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 1;
+    max-width: 720px;
+    margin: 0 auto 0 12px;
+  }
+
+  .search-wrap { min-width: 120px; }
+  .search-clear { margin-right: -8px; }
+
+  .tx-tools,
+  .bulk-actions {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    padding: 6px 11px;
-    border-radius: 7px;
-    border: 1px solid var(--border);
-    background: none;
-    cursor: pointer;
-    font-size: 12.5px;
-    color: var(--text-2);
-    font-family: 'Inter', sans-serif;
-    transition: all 0.12s;
-    white-space: nowrap;
+    gap: 8px;
   }
-  .btn-trash:hover { background: var(--card-hover); color: var(--text-1); }
-  .btn-trash--items {
-    border-color: #D97706;
-    color: #D97706;
-    background: rgba(217,119,6,0.07);
-  }
-  .btn-trash--items:hover { background: rgba(217,119,6,0.14); }
-  :global([data-theme="dark"]) .btn-trash--items { background: rgba(217,119,6,0.12); }
-  :global([data-theme="dark"]) .btn-trash--items:hover { background: rgba(217,119,6,0.2); }
 
-  /* Pending button — same amber color as pending transactions */
-  .btn-pending-items {
-    border-color: #F59E0B !important;
-    color: #F59E0B !important;
-    background: rgba(245, 158, 11, 0.07) !important;
+  .btn-count {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-3);
   }
-  .btn-pending-items:hover { background: rgba(245, 158, 11, 0.14) !important; }
-  :global([data-theme="dark"]) .btn-pending-items { background: rgba(251, 191, 36, 0.12) !important; }
-  :global([data-theme="dark"]) .btn-pending-items:hover { background: rgba(251, 191, 36, 0.2) !important; }
+  .btn.active .btn-count { color: inherit; }
 
+  /* Count of deleted operations, in the corner of the trash button (red as soon as it holds one) */
   .trash-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 17px;
-    height: 17px;
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
     padding: 0 4px;
-    border-radius: 9px;
-    background: #D97706;
-    color: white;
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 1;
+    border-radius: 8px;
+    background: var(--debit);
+    color: var(--card);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 16px;
+    text-align: center;
   }
 
   .bulk-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 9px 18px;
-    background: var(--cobalt-light);
-    border-bottom: 1px solid var(--cobalt-border);
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    background: var(--card-hover);
+    border-bottom: 1px solid var(--border);
     gap: 12px;
   }
   .bulk-count {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
-    color: var(--cobalt);
-    font-family: 'Inter', sans-serif;
+    color: var(--text-1);
   }
-  .bulk-delete-btn {
-    background: var(--danger-bg);
-    color: var(--danger-text);
-    border: 1px solid #FECDD3;
-    font-size: 12px;
-    padding: 5px 10px;
-  }
-  .bulk-delete-btn:hover { background: var(--danger-bg); filter: brightness(0.9); }
 
-  .btn-new-transaction {
-    background: #10B981;
-    border-color: #10B981;
-  }
-  .btn-new-transaction:hover {
-    background: #059669;
-  }
-  .btn-new-transaction:active {
-    background: #047857;
+  @media (max-width: 860px) {
+    .tx-search { max-width: none; flex-basis: 100%; margin: 0; }
+    .search-wrap { flex-basis: 100%; }
   }
 </style>

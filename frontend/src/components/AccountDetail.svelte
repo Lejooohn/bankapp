@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   
   import TransactionListVirtual from './TransactionListVirtual.svelte';
+  import { fmtAmount } from './transactions/tx-format.ts';
   import { lang, t } from '../lib/i18n.ts';
   import { api } from '../lib/api.js';
 
@@ -64,12 +65,17 @@
   }
 
 
+  // The list always holds the whole current year (the API completes the page down to this date)
+  function yearStart() {
+    return `${new Date().getFullYear()}-01-01`;
+  }
+
   async function loadData() {
     loading = true; transactions = []; error = '';
     try {
       const [summary, txData, schedulesData] = await Promise.all([
         api.get(`/api/accounts/${account.id}/summary`),
-        api.get(`/api/accounts/${account.id}/transactions?limit=100&offset=0`),
+        api.get(`/api/accounts/${account.id}/transactions?limit=100&since=${yearStart()}`),
         api.get(`/api/accounts/${account.id}/schedules`)
       ]);
       reconciled = summary.reconciled; pending = summary.pending;
@@ -87,13 +93,14 @@
   // (destroying it loses local state: search text, search results, etc.)
   export async function silentRefresh({ refreshSchedules = false } = {}) {
     try {
-      // Re-fetch as many rows as were already loaded (infinite scroll may have loaded
-      // well beyond the first page) so a refresh never truncates the user's scroll position —
+      // Re-fetch down to the oldest row already loaded (infinite scroll may have gone
+      // back beyond the current year) so a refresh never truncates the user's scroll position —
       // that truncation was racing with in-flight loadMore() calls and producing duplicate ids.
-      const refreshLimit = Math.max(100, transactions.length);
+      const oldest = transactions[transactions.length - 1]?.date.substring(0, 10);
+      const since = oldest && oldest < yearStart() ? oldest : yearStart();
       const [summary, txData, schedulesData] = await Promise.all([
         api.get(`/api/accounts/${account.id}/summary`),
-        api.get(`/api/accounts/${account.id}/transactions?limit=${refreshLimit}&offset=0`),
+        api.get(`/api/accounts/${account.id}/transactions?limit=100&since=${since}`),
         refreshSchedules ? api.get(`/api/accounts/${account.id}/schedules`) : Promise.resolve(null)
       ]);
       reconciled = summary.reconciled; pending = summary.pending;
@@ -120,8 +127,10 @@
     }
   }
 
-  function fmt(n) { const v = parseFloat(n)||0; return (v>=0?'+':'')+v.toFixed(2)+' €'; }
-  function kpiClass(n) { const v=parseFloat(n)||0; return v>0?'credit':v<0?'debit':'neutral'; }
+  let locale = $derived($lang === 'fr' ? 'fr-FR' : 'en-US');
+  const isOverdrawn = (n) => (parseFloat(n) || 0) < 0;
+  const isPositive = (n) => (parseFloat(n) || 0) > 0;
+  const hasPending = (n) => Math.abs(parseFloat(n) || 0) >= 0.005;
 
   export function closeTrash() {
     txListRef?.closeTrash();
@@ -148,29 +157,39 @@
   </div>
 {/if}
 
-<div class="kpi-grid" style="margin-top: 4px;">
-  <div class="kpi-card">
-    <div class="kpi-label">{$t('Solde pointé')}</div>
-    <div class="kpi-value {kpiClass(reconciled)}">{fmt(reconciled)}</div>
+<!-- Read left to right like the foot of a statement: ticked balance, what is left to tick, final balance. -->
+<dl class="balance">
+  <div class="balance-cell">
+    <dt>
+      <svg class="mark-ticked" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.8 10.4c1.5.9 2.8 2.4 3.6 4.6C9.2 9.9 12 5.9 17.2 2.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {$t('Solde pointé')}
+    </dt>
+    <dd class="ticked" class:overdrawn={isOverdrawn(reconciled)}>{fmtAmount(reconciled, locale, 'auto')}</dd>
   </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{$t('À pointer')}</div>
-    <div class="kpi-value {kpiClass(pending)}">{fmt(pending)}</div>
+  <div class="balance-cell">
+    <dt>
+      <svg class="mark-pending" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" stroke-dasharray="3.2 2.3"/></svg>
+      {$t('À pointer')}
+    </dt>
+    <dd class:pending={hasPending(pending)}>{fmtAmount(pending, locale)}</dd>
   </div>
-  <div class="kpi-card">
-    <div class="kpi-label">{$t('Solde final')}</div>
-    <div class="kpi-value {kpiClass(total)}">{fmt(total)}</div>
+  <div class="balance-cell balance-final" class:positive={isPositive(total)} class:overdrawn={isOverdrawn(total)}>
+    <dt>{$t('Solde final')}</dt>
+    <dd><span class="balance-equals" aria-hidden="true">=</span>{fmtAmount(total, locale, 'auto')}</dd>
   </div>
-</div>
+</dl>
 
 {#if simulatedTransactions.length > 0}
   <div class="simulation-banner">
     <div class="simulation-text">
-      📋 Mode simulation : {simulatedTransactions.length} opération(s) en attente de validation
+      {(simulatedTransactions.length > 1
+        ? $t('Mode simulation : {n} opérations en attente de validation')
+        : $t('Mode simulation : {n} opération en attente de validation')
+      ).replace('{n}', String(simulatedTransactions.length))}
     </div>
     <div class="simulation-actions">
-      <button class="btn btn-primary" onclick={validateSimulation}>✓ Valider</button>
-      <button class="btn btn-ghost" onclick={cancelSimulation}>✗ Annuler</button>
+      <button class="btn btn-ghost" onclick={cancelSimulation}>{$t('Annuler')}</button>
+      <button class="btn btn-primary" onclick={validateSimulation}>{$t('Valider')}</button>
     </div>
   </div>
 {/if}
@@ -192,43 +211,91 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    background: #fee;
-    border: 1px solid #fcc;
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #c00;
-    margin-bottom: 16px;
+    margin: 0 0 16px;
   }
 
   .error-banner-close {
     background: none;
     border: none;
-    color: #c00;
+    color: inherit;
     cursor: pointer;
     font-size: 16px;
     line-height: 1;
-    padding: 0 2px;
+    padding: 0 4px;
     flex-shrink: 0;
+  }
+
+  .balance {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.4fr;
+    margin-bottom: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .balance-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px;
+  }
+  .balance-cell + .balance-cell { border-left: 1px solid var(--border); }
+
+  .balance dt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--text-2);
+  }
+
+  .balance dd {
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 40px;
+    color: var(--text-2);
+    white-space: nowrap;
+  }
+
+  .balance-final dd {
+    font-size: 36px;
+    font-weight: 500;
+    color: var(--text-1);
+  }
+
+  /* Each figure wears the color of its state: the ink of the tick, what is left to tick, the result */
+  .mark-ticked,
+  .balance dd.ticked { color: var(--cobalt); }
+  .mark-pending,
+  .balance dd.pending { color: var(--pending); }
+  .balance-final.positive { background: color-mix(in srgb, var(--credit) 7%, transparent); }
+  .balance-final.positive dd { color: var(--credit); }
+  .balance-final.overdrawn { background: color-mix(in srgb, var(--debit) 7%, transparent); }
+  .balance-final.overdrawn dd,
+  .balance dd.ticked.overdrawn { color: var(--debit); }
+
+  .balance-equals {
+    margin-right: 12px;
+    font-weight: 400;
+    color: var(--text-3);
   }
 
   .simulation-banner {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 12px 16px;
     padding: 12px 16px;
     margin-bottom: 16px;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid #3B82F6;
-    border-radius: 8px;
-    color: #3B82F6;
-    font-size: 13px;
-    font-weight: 500;
-  }
-
-  .simulation-text {
-    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
+    color: var(--text-1);
   }
 
   .simulation-actions {
@@ -236,4 +303,9 @@
     gap: 8px;
   }
 
+  @media (max-width: 860px) {
+    .balance { grid-template-columns: 1fr; }
+    .balance-cell + .balance-cell { border-left: none; border-top: 1px solid var(--border); }
+    .balance-final dd { font-size: 32px; }
+  }
 </style>

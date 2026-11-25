@@ -5,6 +5,7 @@
   import LockScreen from './components/LockScreen.svelte';
   import { getToken, clearToken } from './lib/api.js';
   import { loadThemePreferences } from './lib/theme.ts';
+  import { t } from './lib/i18n.ts';
   import './lib/theme.ts';
 
   const LOCK_DELAY = 15 * 60 * 1000; // 15 minutes
@@ -125,7 +126,7 @@
 <main class="min-h-screen app-main">
   {#if !apiHealthy}
     <div class="health-alert">
-      <span style="font-weight:600;">⚠ API Error</span>
+      <span style="font-weight:500;">{$t('Erreur API')}</span>
       <span>{healthCheckError}</span>
     </div>
   {/if}
@@ -140,20 +141,10 @@
 </main>
 
 <style>
-  :global(body) {
-    margin: 0;
-    padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  :global(.app-main) {
     background: var(--surface);
   }
 
-  :global(.app-main) {
-    background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #cffafe 100%);
-  }
-
-  :global([data-theme="dark"] .app-main) {
-    background: linear-gradient(135deg, #0D1117 0%, #111827 50%, #0B2437 100%);
-  }
   :global(*) {
     box-sizing: border-box;
   }
@@ -163,16 +154,16 @@
     top: 0;
     left: 0;
     right: 0;
-    background: #FEE2E2;
-    border-bottom: 2px solid #DC2626;
+    background: var(--card);
+    border-bottom: 1px solid var(--danger-border);
     padding: 12px 20px;
     display: flex;
     align-items: center;
     gap: 12px;
     font-size: 13px;
-    color: #7F1D1D;
+    color: var(--danger-text);
     z-index: 1000;
-    animation: slideDown 0.3s ease-out;
+    animation: slideDown 300ms var(--ease);
   }
 
   @keyframes slideDown {

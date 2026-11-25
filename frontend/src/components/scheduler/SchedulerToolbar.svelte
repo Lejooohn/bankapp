@@ -60,23 +60,23 @@
   .sched-count {
     justify-self: center;
     font-size: 15px; font-weight: 600; color: var(--text-1);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
   .sched-gen-result {
-    font-size: 12px; color: #1D4ED8; background: #DBEAFE;
-    border: 1px solid #93C5FD; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; color: var(--cobalt); background: var(--cobalt-light);
+    border: 1px solid var(--cobalt-border); padding: 3px 10px; border-radius: 20px;
   }
   .sched-countdown {
-    font-size: 12px; color: var(--text-3); background: var(--card-2, #F3F4F6);
+    font-size: 12px; color: var(--text-3); background: var(--card-hover);
     border: 1px solid var(--border, #E5E7EB); padding: 3px 10px; border-radius: 20px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
   .btn-sched-generate {
     display: flex; align-items: center; gap: 6px; padding: 7px 14px;
-    background: #DCFCE7; border: 1px solid #86EFAC; color: #15803D;
+    background: var(--success-bg); border: 1px solid color-mix(in srgb, var(--credit) 30%, transparent); color: var(--credit);
     border-radius: 7px; font-size: 12.5px; font-weight: 500; cursor: pointer;
-    font-family: 'Inter', sans-serif; transition: all 0.15s;
+    font-family: var(--font-ui); transition: all 0.15s;
   }
-  .btn-sched-generate:hover:not(:disabled) { background: #BBF7D0; border-color: #4ADE80; }
+  .btn-sched-generate:hover:not(:disabled) { background: color-mix(in srgb, var(--credit) 18%, transparent); border-color: color-mix(in srgb, var(--credit) 45%, transparent); }
   .btn-sched-generate:disabled { opacity: 0.45; cursor: default; }
 </style>

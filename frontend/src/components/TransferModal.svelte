@@ -155,7 +155,7 @@
           step="0.01"
           min="0"
           placeholder="0.00"
-          style="font-family:'Fira Code',monospace;"
+          style="font-family:var(--font-mono);"
         />
       </div>
     </div>

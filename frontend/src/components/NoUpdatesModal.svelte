@@ -108,7 +108,7 @@
     font-weight: 700;
     color: var(--text-1);
     margin: 0;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   .modal-description {
@@ -116,7 +116,7 @@
     color: var(--text-2);
     margin: 0;
     line-height: 1.6;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     max-width: 340px;
   }
 
@@ -135,7 +135,7 @@
     border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -153,7 +153,7 @@
   .countdown-text {
     font-size: 12px;
     color: var(--text-3);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   .countdown-text strong {

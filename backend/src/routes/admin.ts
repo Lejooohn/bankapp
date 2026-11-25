@@ -3,11 +3,11 @@ import express from 'express';
 
 import bcrypt from 'bcryptjs';
 import fs from 'fs/promises';
-import path from 'path';
 import pool from '../db.js';
 import { createManualBackup } from '../services/backup-create.js';
+import { DELETABLE_CATEGORIES, deleteManualBackups, findBackupFile, isValidBackupName } from '../services/backup-files.js';
 import { requireAdmin, errMsg } from '../lib/shared.js';
-import { adminUsernameSchema, adminPasswordSchema } from '../lib/schemas.js';
+import { adminUsernameSchema, adminPasswordSchema, backupCategorySchema, deleteManualBackupsSchema } from '../lib/schemas.js';
 
 const router = express.Router();
 
@@ -114,19 +114,23 @@ router.post('/api/backup/create', async (req, res) => {
   }
 });
 
-// DELETE /api/backup/:filename - Delete a full database backup (admin only)
+// DELETE /api/backup/:filename?category= - Delete a full database backup (admin only). Weekly and monthly dumps
+// are refused: only their retention removes them.
 router.delete('/api/backup/:filename', async (req, res) => {
   if (!requireAdmin(req, res)) return;
 
-  const BACKUP_FILENAME_RE = /^bankapp-\d{8}-\d{6}\.sql\.gz$/;
-  if (!BACKUP_FILENAME_RE.test(req.params.filename)) {
+  const category = backupCategorySchema.safeParse(req.query.category);
+  if (!category.success) return res.status(400).json({ error: 'Type de sauvegarde invalide' });
+  if (category.data && !DELETABLE_CATEGORIES.includes(category.data)) {
+    return res.status(400).json({ error: 'Cette sauvegarde est supprimée automatiquement à la fin de sa conservation' });
+  }
+  if (!isValidBackupName(req.params.filename, category.data)) {
     return res.status(400).json({ error: 'Nom de fichier de sauvegarde invalide' });
   }
 
   try {
     const backupDir = process.env.BACKUP_DIR || '/backups';
-    const filePath = path.join(backupDir, 'last', req.params.filename);
-    await fs.unlink(filePath);
+    await fs.unlink(await findBackupFile(backupDir, req.params.filename, category.data));
 
     // Remove from backups table
     await pool.query('DELETE FROM backups WHERE filename = $1', [req.params.filename]);
@@ -136,6 +140,22 @@ router.delete('/api/backup/:filename', async (req, res) => {
     res.status(err.code === 'ENOENT' ? 404 : 500).json({
       error: err.code === 'ENOENT' ? 'Fichier de sauvegarde introuvable' : errMsg(err),
     });
+  }
+});
+
+// POST /api/backup/manual/delete-bulk - Delete several manual backups at once (admin only)
+router.post('/api/backup/manual/delete-bulk', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const parsed = deleteManualBackupsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+
+  try {
+    const { deleted, failed } = await deleteManualBackups(process.env.BACKUP_DIR || '/backups', parsed.data.filenames);
+    await pool.query('DELETE FROM backups WHERE filename = ANY($1::text[])', [deleted]);
+    res.json({ deleted, failed });
+  } catch (err: any) {
+    res.status(500).json({ error: errMsg(err) });
   }
 });
 

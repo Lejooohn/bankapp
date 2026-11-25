@@ -205,7 +205,7 @@
     font-weight: 700;
     color: var(--text-1);
     margin: 0;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     flex: 1;
     text-align: center;
   }
@@ -262,14 +262,14 @@
     font-size: 16px;
     font-weight: 700;
     color: var(--text-1);
-    font-family: 'Fira Code', monospace;
+    font-family: var(--font-mono);
   }
 
   .projection-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   .projection-table thead {
@@ -300,7 +300,7 @@
 
   .projection-table .amount-col {
     text-align: right;
-    font-family: 'Fira Code', monospace;
+    font-family: var(--font-mono);
     padding-right: 24px;
     padding-left: 12px;
   }

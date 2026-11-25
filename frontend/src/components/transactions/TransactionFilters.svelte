@@ -34,87 +34,80 @@
 </script>
 
 <!-- Advanced filters panel -->
-<div style="padding:20px; border-bottom:1px solid var(--border); background:var(--bg-2); display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:20px;">
+<div class="filters">
 
   <!-- Text filter (always active, no checkbox) -->
-  <div style="display:flex; flex-direction:column; gap:10px;">
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span style="font-size:16px;">🔍</span>
-      <span style="font-weight:600; font-size:14px; color:var(--text-1);">{$t('Texte')}</span>
-    </div>
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      <input type="text" bind:value={searchText} placeholder={$t('Nom, détail…')} style="padding:8px 12px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1); transition:border-color 250ms;" />
-      <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; color:var(--text-2); transition:color 250ms;" onmouseenter={(e) => e.currentTarget.style.color = 'var(--text-1)'} onmouseleave={(e) => e.currentTarget.style.color = 'var(--text-2)'}>
-        <input type="checkbox" bind:checked={excludeText} style="margin:0; cursor:pointer; width:16px; height:16px;" />
+  <div class="filter">
+    <div class="filter-label">{$t('Texte')}</div>
+    <div class="filter">
+      <input class="filter-input" type="text" bind:value={searchText} placeholder={$t('Nom, détail…')} />
+      <label class="filter-option">
+        <input type="checkbox" bind:checked={excludeText} />
         <span>{$t('Inverse la recherche')}</span>
       </label>
     </div>
   </div>
 
   <!-- Amount comparison filter -->
-  <div style="display:flex; flex-direction:column; gap:10px;">
-    <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; cursor:pointer; color:var(--text-1);">
-      <input type="checkbox" bind:checked={activeFilters.amountComparison} style="margin:0; cursor:pointer; width:16px; height:16px;" />
-      <span style="font-size:16px;">💰</span>
+  <div class="filter">
+    <label class="filter-label">
+      <input type="checkbox" bind:checked={activeFilters.amountComparison} />
       <span>{$t('Montant spécifique')}</span>
     </label>
     {#if activeFilters.amountComparison}
-      <div style="display:flex; gap:8px; align-items:center; animation:slideDown 250ms ease;">
-        <select bind:value={amountComparison} style="padding:8px 10px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1); font-weight:600; min-width:60px; transition:border-color 250ms;">
+      <div class="filter-values">
+        <select class="filter-input" bind:value={amountComparison}>
           <option value=">">{$t('Plus de')}</option>
           <option value="<">{$t('Moins de')}</option>
           <option value=">=">&ge;</option>
           <option value="<=">&le;</option>
           <option value="=">=</option>
         </select>
-        <input type="number" bind:value={amountComparisonValue} placeholder="500" style="flex:1; padding:8px 12px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1); transition:border-color 250ms;" />
-        <span style="color:var(--text-3); font-size:12px; white-space:nowrap;">{$t('EUR')}</span>
+        <input class="filter-input" type="number" bind:value={amountComparisonValue} placeholder="500" />
+        <span class="filter-unit">{$t('EUR')}</span>
       </div>
     {/if}
   </div>
 
   <!-- Amount range filter -->
-  <div style="display:flex; flex-direction:column; gap:10px;">
-    <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; cursor:pointer; color:var(--text-1);">
-      <input type="checkbox" bind:checked={activeFilters.amountRange} style="margin:0; cursor:pointer; width:16px; height:16px;" />
-      <span style="font-size:16px;">💰</span>
+  <div class="filter">
+    <label class="filter-label">
+      <input type="checkbox" bind:checked={activeFilters.amountRange} />
       <span>{$t('Montant')} (min-max)</span>
     </label>
     {#if activeFilters.amountRange}
-      <div style="display:flex; gap:8px; align-items:center; animation:slideDown 250ms ease;">
-        <input type="number" bind:value={amountRangeMin} placeholder={$t('Min')} style="flex:1; padding:8px 12px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1); transition:border-color 250ms;" />
-        <span style="color:var(--text-3); font-weight:600;">—</span>
-        <input type="number" bind:value={amountRangeMax} placeholder={$t('Max')} style="flex:1; padding:8px 12px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1); transition:border-color 250ms;" />
+      <div class="filter-values">
+        <input class="filter-input" type="number" bind:value={amountRangeMin} placeholder={$t('Min')} />
+        <span class="filter-unit">–</span>
+        <input class="filter-input" type="number" bind:value={amountRangeMax} placeholder={$t('Max')} />
       </div>
     {/if}
   </div>
 
   <!-- Date range filter -->
-  <div style="display:flex; flex-direction:column; gap:10px;">
-    <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; cursor:pointer; color:var(--text-1);">
-      <input type="checkbox" bind:checked={activeFilters.dateRange} style="margin:0; cursor:pointer; width:16px; height:16px;" />
-      <span style="font-size:16px;">📅</span>
+  <div class="filter" class:filter-wide={activeFilters.dateRange}>
+    <label class="filter-label">
+      <input type="checkbox" bind:checked={activeFilters.dateRange} />
       <span>{$t('Période')} (date)</span>
     </label>
     {#if activeFilters.dateRange}
-      <div style="display:flex; gap:8px; align-items:center; animation:slideDown 250ms ease;">
-        <DateInput bind:value={dateRangeStart} style="flex:1; padding:8px 12px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1); transition:border-color 250ms;" />
-        <span style="color:var(--text-3); font-weight:600;">—</span>
-        <DateInput bind:value={dateRangeEnd} style="flex:1; padding:8px 12px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1); transition:border-color 250ms;" />
+      <div class="filter-values">
+        <DateInput bind:value={dateRangeStart} style="flex:1 1 160px; width:auto; min-height:36px; padding:0 12px; font-size:14px; border:1px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1);" />
+        <span class="filter-unit">–</span>
+        <DateInput bind:value={dateRangeEnd} style="flex:1 1 160px; width:auto; min-height:36px; padding:0 12px; font-size:14px; border:1px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1);" />
       </div>
     {/if}
   </div>
 
   <!-- Category filter -->
   {#if allCategoryNames.length > 0}
-    <div style="display:flex; flex-direction:column; gap:10px;">
-      <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; cursor:pointer; color:var(--text-1);">
-        <input type="checkbox" bind:checked={activeFilters.category} style="margin:0; cursor:pointer; width:16px; height:16px;" />
-        <span style="font-size:16px;">🏷️</span>
+    <div class="filter">
+      <label class="filter-label">
+        <input type="checkbox" bind:checked={activeFilters.category} />
         <span>{$t('Catégorie')}</span>
       </label>
       {#if activeFilters.category}
-        <div style="animation:slideDown 250ms ease;">
+        <div class="filter-values filter-block">
           <CategorySelect bind:value={filterCategory} categories={allCategoryNames} label={$t('— Toutes')} />
         </div>
       {/if}
@@ -122,14 +115,13 @@
   {/if}
 
   <!-- Reconciliation filter -->
-  <div style="display:flex; flex-direction:column; gap:10px;">
-    <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; cursor:pointer; color:var(--text-1);">
-      <input type="checkbox" bind:checked={activeFilters.reconciled} style="margin:0; cursor:pointer; width:16px; height:16px;" />
-      <span style="font-size:16px;">✓</span>
+  <div class="filter">
+    <label class="filter-label">
+      <input type="checkbox" bind:checked={activeFilters.reconciled} />
       <span>{$t('Pointage')}</span>
     </label>
     {#if activeFilters.reconciled}
-      <select bind:value={filterReconciled} style="padding:8px 12px; font-size:14px; border:1.5px solid var(--border); border-radius:8px; background:var(--input-bg); color:var(--text-1); transition:border-color 250ms; animation:slideDown 250ms ease;">
+      <select class="filter-input" bind:value={filterReconciled}>
         <option value={null}>{$t('— Tous états')}</option>
         <option value={false}>{$t('À pointer')}</option>
         <option value={true}>{$t('Pointées')}</option>
@@ -139,14 +131,67 @@
 </div>
 
 <style>
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px 24px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .filter {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  /* Two date fields need two columns */
+  @media (min-width: 861px) { .filter-wide { grid-column: span 2; } }
+  .filter-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-1);
+  }
+  .filter-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  label { cursor: pointer; }
+  input[type="checkbox"] { width: 16px; height: 16px; margin: 0; cursor: pointer; }
+  .filter-values {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: filter-in 160ms var(--ease);
+  }
+  .filter-block { display: block; }
+  .filter-input {
+    flex: 1;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 12px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text-1);
+    transition: border-color 150ms var(--ease);
+  }
+  .filter > .filter-input { flex: none; }
+  .filter-unit {
+    font-size: 13px;
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+  @keyframes filter-in {
+    from { opacity: 0; transform: translateY(-4px); }
   }
 </style>

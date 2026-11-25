@@ -1,25 +1,26 @@
 // Shared payment-mode icon/color mapping — single source of truth so the
 // transaction list, edit modal and new-transaction modal stay visually consistent.
 
+// Line icons (lucide) in the current text color; callers that want a tint set it with modeBadgeStyle().
 const ICONS = {
-  'Retrait DAB': '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="2.5" width="16" height="19" rx="2" stroke="#EC4899" stroke-width="1.8"/><rect x="7" y="5.5" width="10" height="6" rx="1" stroke="#EC4899" stroke-width="1.8"/><path d="M7 15h4M7 18h2.5" stroke="#EC4899" stroke-width="1.8" stroke-linecap="round"/><path d="M15.5 14.5v5M13.5 17.5l2 2 2-2" stroke="#EC4899" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'Prélèvement': '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round"/><path d="M18.5 3.5v4h-4M5.5 20.5v-4h4" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'Virement reçu': '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="#00D084" stroke-width="1.8"/><path d="M17 7L7 17M7 11v6h6" stroke="#00D084" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'Virement émis': '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="#EF4444" stroke-width="1.8"/><path d="M7 17L17 7M11 7h6v6" stroke="#EF4444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'Versement': '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="18" height="10" rx="2" stroke="#00D084" stroke-width="1.8"/><circle cx="12" cy="14" r="2.2" stroke="#00D084" stroke-width="1.8"/><path d="M12 2v5M9 4.5 12 7l3-2.5" stroke="#00D084" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'Carte': '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="5" width="19" height="14" rx="2.5" stroke="#8B5CF6" stroke-width="1.8"/><path d="M2.5 9.5h19" stroke="#8B5CF6" stroke-width="1.8"/><rect x="5.5" y="13" width="4" height="2.6" rx="0.6" fill="#8B5CF6"/></svg>',
-  'Chèque émis': '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="13" rx="2" stroke="#06B6D4" stroke-width="1.8"/><path d="M6 9.5h8M6 13h5" stroke="#06B6D4" stroke-width="1.8" stroke-linecap="round"/><path d="M15 15.5l4.5-4.5M19.5 11v3.5h-3.5" stroke="#06B6D4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'Dépôt de chèque': '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="8" width="18" height="12" rx="2" stroke="#06B6D4" stroke-width="1.8"/><path d="M6 12.5h6M6 16h4" stroke="#06B6D4" stroke-width="1.8" stroke-linecap="round"/><path d="M17 2v6M14.5 5.5 17 8l2.5-2.5" stroke="#06B6D4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  'Retrait DAB': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>',
+  'Prélèvement': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>',
+  'Virement reçu': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M17 7 7 17"/><path d="M17 17H7V7"/></svg>',
+  'Virement émis': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>',
+  'Versement': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg>',
+  'Carte': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg>',
+  'Chèque émis': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>',
+  'Dépôt de chèque': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>',
 };
 
 const COLORS = {
-  'Prélèvement':     '#F59E0B',
+  'Prélèvement':     '#0EA5E9',
   'Versement':       '#00D084',
   'Virement reçu':   '#00D084',
   'Virement émis':   '#EF4444',
   'Carte':           '#8B5CF6',
-  'Chèque émis':     '#06B6D4',
-  'Dépôt de chèque': '#06B6D4',
+  'Chèque émis':     '#14B8A6',
+  'Dépôt de chèque': '#14B8A6',
   'Retrait DAB':     '#EC4899',
 };
 
@@ -42,10 +43,10 @@ export function modeColor(type) {
   if (COLORS[type]) return COLORS[type];
   const t = type.toLowerCase();
   if (t.includes('virement'))                           return '#3B82F6';
-  if (t.includes('prél') || t.includes('prelevement'))  return '#F59E0B';
+  if (t.includes('prél') || t.includes('prelevement'))  return '#0EA5E9';
   if (t.includes('versement'))                          return '#00D084';
   if (t.includes('carte') || t.includes(' cb'))         return '#8B5CF6';
-  if (t.includes('chèque') || t.includes('cheque'))     return '#06B6D4';
+  if (t.includes('chèque') || t.includes('cheque'))     return '#14B8A6';
   if (t.includes('retrait') || t.includes('dab') || t.includes('espèce')) return '#EC4899';
   if (t.includes('dépôt') || t.includes('depot'))       return '#00D084';
   return '#94A3B8';

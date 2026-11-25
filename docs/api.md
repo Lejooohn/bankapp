@@ -49,15 +49,46 @@ Rename a user account (admin only).
 
 ## Backup Endpoints
 
+A full dump is designated by its name and its level, `category`: `daily`, `weekly`, `monthly`, `manual` or
+`pre-restore` (the folder that holds it). A weekly and a monthly dump can have the same name.
+
 ### GET /api/backup/status
 
-Retrieve backup inventory and safety snapshots (admin sees full database backups, users see only their own account snapshots).
+`{ status, backups, safetySnapshots, policy, nextRun, automatic }`. Admins get every full dump of every level, and
+`automatic` (last daily dump and `state`: `ok`, `late` after 26 h, `none`). Other users only get the snapshots of
+their own account (`?accountId=`). `policy` is read from the settings given to the backup sidecar
+(`x-backup-policy` in `docker-compose.yml`); an unreadable setting is `null`.
+
+### GET /api/backup/download/:filename?category=
+
+Download a full dump, decrypted (admin only).
+
+### DELETE /api/backup/:filename?category=
+
+Delete a full dump (admin only). Weekly and monthly dumps are refused: only their retention removes them.
+
+### POST /api/accounts/:id/backup/restore
+
+Body: `{ filename, category?, tables, destination, newAccountName? }`. Full dumps are admin only.
+
+### POST /api/backup/manual/delete-bulk
+
+Delete several manual backups (admin only). Body: `{ filenames: [...] }`, the names to delete from `manual/`;
+scheduled dumps are never touched. Returns `{ deleted, failed }`.
 
 ---
 
 ## See Also
 - `backend/src/services/wal-monitor.ts` — WAL gap monitoring implementation
 - `backend/src/index.ts` (~3680) — Cron job that monitors WAL gap every 15 minutes
+
+## Operations
+
+### GET /api/accounts/:id/transactions
+
+Newest first, as `{ data, total }`. `limit` (default 100, max 500) and `offset` page through the list.
+`since` (`YYYY-MM-DD`) extends the page so it holds every operation from that day on, even beyond `limit`;
+an invalid date is a `400`. The Operations page uses it to load the whole current year.
 
 ## Authentication: second factor (TOTP)
 
@@ -113,7 +144,7 @@ client's correct login. Accounts without a second factor have no account-wide ca
 - API: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
   `Cross-Origin-Resource-Policy: same-origin`. No `X-Powered-By`.
 - Web (nginx): the same headers plus a Content-Security-Policy that allows same-origin scripts only, no
-  inline script, and Google Fonts for styles and fonts.
+  inline script, and nothing from another host (fonts are bundled).
 
 ---
 

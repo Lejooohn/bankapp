@@ -10,6 +10,8 @@ const router = express.Router();
 
 // ── Categorization rules ──────────────────────────────────────────────────────
 
+const DUPLICATE_RULE = 'Une règle avec ce tiers et ces détails existe déjà';
+
 router.get('/api/accounts/:id/rules', async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
   try {
@@ -17,7 +19,7 @@ router.get('/api/accounts/:id/rules', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const result = await pool.query('SELECT * FROM categorization_rules WHERE account_id = $1 AND user_id = $2 AND active = true ORDER BY created_at DESC', [req.params.id, req.user.id]);
+    const result = await pool.query('SELECT * FROM categorization_rules WHERE account_id = $1 AND user_id = $2 AND deleted_at IS NULL ORDER BY created_at DESC', [req.params.id, req.user.id]);
     res.json(result.rows);
   } catch (err: any) { res.status(500).json({ error: errMsg(err) }); }
 });
@@ -32,13 +34,19 @@ router.post('/api/accounts/:id/rules', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    // A deleted rule keeps its row, hence its place in the unique key: creating it again revives it.
     const result = await pool.query(
-      'INSERT INTO categorization_rules (account_id, user_id, tiers_pattern, details_pattern, category) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      `INSERT INTO categorization_rules (account_id, user_id, tiers_pattern, details_pattern, category) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT ON CONSTRAINT categorization_rules_account_tiers_details_key
+       DO UPDATE SET category = EXCLUDED.category, user_id = EXCLUDED.user_id, active = true, deleted_at = NULL, created_at = NOW()
+       WHERE categorization_rules.deleted_at IS NOT NULL
+       RETURNING *`,
       [req.params.id, req.user.id, tiers_pattern, details_pattern || null, category]
     );
+    if (result.rows.length === 0) return res.status(409).json({ error: DUPLICATE_RULE });
     res.json(result.rows[0]);
   } catch (err: any) {
-    if (err.code === '23505') return res.status(409).json({ error: `Une règle avec ce tiers et ces details existe déjà` });
+    if (err.code === '23505') return res.status(409).json({ error: DUPLICATE_RULE });
     res.status(500).json({ error: errMsg(err) });
   }
 });
@@ -75,12 +83,15 @@ router.patch('/api/accounts/:id/rules/:ruleId', async (req, res) => {
 
     params.push(req.params.ruleId, req.params.id, req.user.id);
     const result = await pool.query(
-      `UPDATE categorization_rules SET ${updates.join(', ')} WHERE id = $${paramIndex++} AND account_id = $${paramIndex++} AND user_id = $${paramIndex++} RETURNING *`,
+      `UPDATE categorization_rules SET ${updates.join(', ')} WHERE id = $${paramIndex++} AND account_id = $${paramIndex++} AND user_id = $${paramIndex++} AND deleted_at IS NULL RETURNING *`,
       params
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Rule not found' });
     res.json(result.rows[0]);
-  } catch (err: any) { res.status(500).json({ error: errMsg(err) }); }
+  } catch (err: any) {
+    if (err.code === '23505') return res.status(409).json({ error: DUPLICATE_RULE });
+    res.status(500).json({ error: errMsg(err) });
+  }
 });
 
 router.delete('/api/accounts/:id/rules/:ruleId', async (req, res) => {
@@ -90,7 +101,7 @@ router.delete('/api/accounts/:id/rules/:ruleId', async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    await pool.query('UPDATE categorization_rules SET active = false WHERE id = $1 AND account_id = $2 AND user_id = $3', [req.params.ruleId, req.params.id, req.user.id]);
+    await pool.query('UPDATE categorization_rules SET active = false, deleted_at = NOW() WHERE id = $1 AND account_id = $2 AND user_id = $3 AND deleted_at IS NULL', [req.params.ruleId, req.params.id, req.user.id]);
     res.json({ success: true });
   } catch (err: any) { res.status(500).json({ error: errMsg(err) }); }
 });
@@ -105,7 +116,7 @@ router.patch('/api/accounts/:id/rules/:ruleId/add-patterns', async (req, res) =>
     }
 
     const ruleRes = await pool.query(
-      'SELECT tiers_pattern, details_pattern FROM categorization_rules WHERE id = $1 AND account_id = $2 AND user_id = $3',
+      'SELECT tiers_pattern, details_pattern FROM categorization_rules WHERE id = $1 AND account_id = $2 AND user_id = $3 AND deleted_at IS NULL',
       [req.params.ruleId, req.params.id, req.user.id]
     );
     if (ruleRes.rows.length === 0) return res.status(404).json({ error: 'Rule not found' });
@@ -117,7 +128,10 @@ router.patch('/api/accounts/:id/rules/:ruleId/add-patterns', async (req, res) =>
       [newTiers, newDetails, req.params.ruleId, req.params.id, req.user.id]
     );
     res.json(result.rows[0]);
-  } catch (err: any) { res.status(500).json({ error: errMsg(err) }); }
+  } catch (err: any) {
+    if (err.code === '23505') return res.status(409).json({ error: DUPLICATE_RULE });
+    res.status(500).json({ error: errMsg(err) });
+  }
 });
 
 router.get('/api/accounts/:id/apply-rules-preview', async (req, res) => {
@@ -260,7 +274,7 @@ router.put('/api/accounts/:id/rules/:ruleId/toggle', async (req, res) => {
     }
 
     const r = await pool.query(
-      'UPDATE categorization_rules SET active = NOT active WHERE id = $1 AND account_id = $2 AND user_id = $3 RETURNING *',
+      'UPDATE categorization_rules SET active = NOT active WHERE id = $1 AND account_id = $2 AND user_id = $3 AND deleted_at IS NULL RETURNING *',
       [req.params.ruleId, req.params.id, req.user.id]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Rule not found' });
@@ -276,7 +290,7 @@ router.get('/api/accounts/:id/rules/:ruleId/preview', async (req, res) => {
     }
 
     const ruleRes = await pool.query(
-      'SELECT tiers_pattern, details_pattern, category FROM categorization_rules WHERE id = $1 AND account_id = $2 AND user_id = $3',
+      'SELECT tiers_pattern, details_pattern, category FROM categorization_rules WHERE id = $1 AND account_id = $2 AND user_id = $3 AND deleted_at IS NULL',
       [req.params.ruleId, req.params.id, req.user.id]
     );
     if (!ruleRes.rows.length) return res.status(404).json({ error: 'Rule not found' });
@@ -309,7 +323,7 @@ router.get('/api/accounts/:id/rules/:ruleId/matches', async (req, res) => {
     const offset = (page - 1) * limit;
 
     const ruleRes = await pool.query(
-      'SELECT tiers_pattern, details_pattern, category FROM categorization_rules WHERE id = $1 AND account_id = $2 AND user_id = $3',
+      'SELECT tiers_pattern, details_pattern, category FROM categorization_rules WHERE id = $1 AND account_id = $2 AND user_id = $3 AND deleted_at IS NULL',
       [req.params.ruleId, req.params.id, req.user.id]
     );
     if (!ruleRes.rows.length) return res.status(404).json({ error: 'Rule not found' });
@@ -364,7 +378,7 @@ router.post('/api/accounts/:id/rules/:ruleId/apply', async (req, res) => {
     }
 
     const ruleRes = await pool.query(
-      'SELECT tiers_pattern, details_pattern, category FROM categorization_rules WHERE id = $1 AND account_id = $2 AND user_id = $3',
+      'SELECT tiers_pattern, details_pattern, category FROM categorization_rules WHERE id = $1 AND account_id = $2 AND user_id = $3 AND deleted_at IS NULL',
       [req.params.ruleId, req.params.id, req.user.id]
     );
     if (!ruleRes.rows.length) return res.status(404).json({ error: 'Rule not found' });

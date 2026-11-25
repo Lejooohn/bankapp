@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { lang, t } from '../lib/i18n.ts';
   import { api } from '../lib/api.js';
+  import Icon from './Icon.svelte';
   import AccountList from './AccountList.svelte';
   import AccountDetail from './AccountDetail.svelte';
   import CategoriesView from './CategoriesView.svelte';
@@ -20,6 +21,7 @@
   let simulatedTransactions = $state([]);
   let accountDetailRef: ReturnType<typeof AccountDetail> | undefined = $state();
   let error = $state('');
+  let menuOpen = $state(false); // small screens only
 
   onMount(loadAccounts);
 
@@ -57,6 +59,7 @@
   }
 
   function handleAccountSelect(e) {
+    menuOpen = false;
     selectedAccount = e.detail;
     currentView = 'transactions';
     localStorage.setItem('selectedAccountId', selectedAccount.id);
@@ -64,6 +67,7 @@
   }
 
   function handleViewChange(e) {
+    menuOpen = false;
     if (e.detail === 'transactions' && currentView === 'transactions') {
       accountDetailRef?.closeTrash();
       return;
@@ -76,7 +80,14 @@
 </script>
 
 <div class="app-shell">
-  <aside class="sidebar">
+  <div class="mobile-bar">
+    <span class="mobile-title">{selectedAccount?.name ?? 'BankApp'}</span>
+    <button class="btn btn-ghost btn-square" aria-label={$t('Menu')} title={$t('Menu')} aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>
+      <Icon name={menuOpen ? 'x' : 'menu'} />
+    </button>
+  </div>
+
+  <aside class="sidebar" class:menu-open={menuOpen}>
     <AccountList
       {accounts}
       {selectedAccount}
@@ -123,7 +134,7 @@
 <style>
   .app-shell {
     display: grid;
-    grid-template-columns: 228px 1fr;
+    grid-template-columns: 264px minmax(0, 1fr);
     grid-template-rows: 1fr;
     min-height: 100vh;
   }
@@ -139,6 +150,28 @@
     grid-column: 2;
     grid-row: 1;
     overflow-y: auto;
+    /* Fills the window up to 2400 (ultra-wide screens); padding rather than max-width, so fixed overlays keep the full window */
+    padding-inline: max(32px, calc((100% - 2400px) / 2));
+  }
+
+  .mobile-bar { display: none; }
+
+  /* Small screens: the sidebar folds into one menu button and the page scrolls as one. */
+  @media (max-width: 860px) {
+    .app-shell { display: block; height: auto; overflow: visible; }
+    .mobile-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      padding: 0 16px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+    .mobile-title { font-size: 16px; font-weight: 500; }
+    .sidebar { display: none; width: auto; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .sidebar.menu-open { display: flex; }
+    .main { padding: 16px; overflow: visible; }
   }
 
   .error-banner {
@@ -146,23 +179,17 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    background: #fee;
-    border: 1px solid #fcc;
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #c00;
-    margin: 16px 24px 0;
+    margin: 0 0 16px;
   }
 
   .error-banner-close {
     background: none;
     border: none;
-    color: #c00;
+    color: inherit;
     cursor: pointer;
     font-size: 16px;
     line-height: 1;
-    padding: 0 2px;
+    padding: 0 4px;
     flex-shrink: 0;
   }
 
@@ -173,6 +200,6 @@
     justify-content: center;
     min-height: 200px;
     color: var(--text-2);
-    font-size: 1rem;
+    font-size: 14px;
   }
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
   import AboutModal from './AboutModal.svelte';
   import MfaSettingsModal from './MfaSettingsModal.svelte';
   import { stopPropagation } from '../lib/events';
@@ -195,9 +196,9 @@
 </script>
 
 <div class="profile-section">
-  <button class="profile-button" onclick={() => (showManageModal = true)}>
-    <span class="profile-icon">👤</span>
-    <span class="profile-username">{currentUser?.username || 'Not logged in'}</span>
+  <button class="side-row" onclick={() => (showManageModal = true)}>
+    <span class="side-row-icon"><Icon name="user" /></span>
+    <span class="side-row-label">{currentUser?.username || $t('Profil')}</span>
   </button>
 </div>
 
@@ -219,7 +220,7 @@
 
       <div class="modal-body">
         <div class="profile-card">
-          <div class="profile-avatar">👤</div>
+          <div class="profile-avatar"><Icon name="user" size={18} /></div>
           <div class="profile-username-display">{currentUser?.username || 'Not logged in'}</div>
         </div>
 
@@ -586,45 +587,7 @@
   {/if}
 
 <style>
-  .profile-section {
-    padding: 10px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .profile-button {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    padding: 12px 10px;
-    background: var(--card-hover);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    cursor: pointer;
-    color: var(--text-1);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.85rem;
-    transition: all 0.15s;
-  }
-
-  .profile-button:hover {
-    background: var(--border);
-    transform: translateY(-1px);
-  }
-
-  .profile-icon {
-    font-size: 18px;
-  }
-
-  .profile-username {
-    text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-  }
+  .profile-section { margin: 2px 0; }
 
   .modal-overlay {
     position: fixed;
@@ -693,8 +656,8 @@
   }
 
   .profile-avatar {
-    font-size: 32px;
-    line-height: 1;
+    display: flex;
+    color: var(--text-2);
   }
 
   .profile-username-display {
@@ -736,7 +699,7 @@
     border-radius: 8px;
     background: var(--card);
     color: var(--text-1);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -891,7 +854,7 @@
     border-radius: 6px;
     background: var(--input-bg);
     color: var(--text-1);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     font-size: 0.95rem;
     transition: border-color 0.2s;
   }
@@ -923,7 +886,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   .btn-cancel {

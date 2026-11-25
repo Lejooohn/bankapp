@@ -166,7 +166,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   .hour-cell:disabled {

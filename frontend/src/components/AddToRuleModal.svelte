@@ -32,6 +32,8 @@
         api.get(`/api/accounts/${account.id}/rules`),
         api.get(`/api/accounts/${account.id}/categories`),
       ]);
+      // A switched-off rule would not apply: adding a word to it would do nothing
+      rules = rules.filter(rule => rule.active);
     } catch (e) {
       console.error(e);
       error = $t('Erreur lors du chargement des règles');

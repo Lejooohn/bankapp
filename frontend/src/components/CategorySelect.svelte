@@ -180,7 +180,7 @@
     background: var(--surface);
     color: var(--text-1);
     font-size: 14px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -289,7 +289,7 @@
     background: var(--surface);
     color: var(--text-1);
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     margin-bottom: 4px;
     width: 100%;
     box-sizing: border-box;

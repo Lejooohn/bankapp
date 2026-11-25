@@ -3,8 +3,10 @@
   import { createEventDispatcher } from 'svelte';
   import { api } from '../lib/api.js';
   import { lang, t } from '../lib/i18n.ts';
+  import { backupTitle, backupNote } from './backup/backup-format.ts';
 
-  let { account, backup } = $props();
+  // undo: the copy was made before a restore, and puts back the data that restore replaced.
+  let { account, backup, undo = false } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -29,11 +31,24 @@
       : [...selectedTables, key];
   }
 
+  let locale = $derived($lang === 'fr' ? 'fr-FR' : 'en-US');
+  let title = $derived(backupTitle(backup, locale, $t));
+  // The word to type follows the interface language
+  let confirmWord = $derived($t('RESTAURER'));
+  // A snapshot is put back whole: there is nothing to choose.
+  let isSnapshot = $derived(!backup.category);
   let canSubmit =
-    $derived(selectedTables.length > 0 &&
+    $derived((isSnapshot || selectedTables.length > 0) &&
     (destination === 'new'
       ? newAccountName.trim().length > 0
-      : confirmInput.trim().toUpperCase() === 'RESTAURER'));
+      : confirmInput.trim().toUpperCase() === confirmWord));
+
+  let warning = $derived((undo
+    ? $t('Les données actuelles du compte « {account} » seront remplacées par celles d\'avant la restauration. Ce retour en arrière est définitif.')
+    : isSnapshot
+      ? $t('Les données actuelles du compte « {account} » seront remplacées par celles de cette copie. Cette action ne peut pas être annulée.')
+      : $t('Les données choisies du compte « {account} » seront remplacées. BankApp en garde une copie : vous pourrez revenir en arrière.')
+  ).replace('{account}', account.name));
 
   async function submit() {
     isSubmitting = true;
@@ -41,13 +56,14 @@
     try {
       const body = {
         filename: backup.filename,
-        tables: selectedTables,
+        ...(backup.category ? { category: backup.category } : {}),
+        tables: isSnapshot ? TABLE_OPTIONS.map(o => o.key) : selectedTables,
         destination,
         ...(destination === 'new' ? { newAccountName: newAccountName.trim() } : {}),
       };
       const result = await api.post(`/api/accounts/${account.id}/backup/restore`, body);
       resultMessage = result.results
-        .map(r => `${r.table}: ${r.inserted}`)
+        .map(r => `${$t(TABLE_OPTIONS.find(o => o.key === r.table)?.label ?? r.table)} : ${r.inserted}`)
         .join(', ');
       dispatch('restored', result);
     } catch (err) {
@@ -60,9 +76,9 @@
 
 <div class="modal-overlay" onclick={self(() => dispatch('close'))} onkeydown={(e) => e.key === 'Escape' && dispatch('close')} role="presentation">
   <div class="modal-box" onclick={stopPropagation()} onkeydown={stopPropagation()} role="presentation" style="width:420px;">
-    <h2 class="modal-title">{$t('Restaurer une sauvegarde')}</h2>
+    <h2 class="modal-title">{undo ? $t('Revenir avant cette restauration') : $t('Restaurer une sauvegarde')}</h2>
     <p style="font-size:12.5px; color:var(--text-3); margin-bottom:12px;">
-      {backup.date} {backup.time}
+      {[title, backupNote(backup, locale, $t)].filter(Boolean).join(', ')}
     </p>
 
     {#if resultMessage}
@@ -71,6 +87,7 @@
         <button class="btn btn-primary" onclick={() => dispatch('close')}>{$t('Fermer')}</button>
       </div>
     {:else}
+      {#if !isSnapshot}
       <p style="font-size:12.5px; font-weight:600; color:var(--text-2); margin-bottom:6px;">
         {$t('Type de données à restaurer')}
       </p>
@@ -80,8 +97,9 @@
           {$t(opt.label)}
         </label>
       {/each}
+      {/if}
 
-      {#if !backup.isSafetySnapshot}
+      {#if backup.category}
         <p style="font-size:12.5px; font-weight:600; color:var(--text-2); margin:14px 0 6px;">
           {$t('Destination')}
         </p>
@@ -103,28 +121,28 @@
           style="width:100%; margin-top:8px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-1); font-size:14px;"
         />
       {:else}
-        <p style="font-size:12.5px; color:#EF4444; line-height:1.5; margin:12px 0 8px;">
-          ⚠️ {$t('Cette action remplacera les données sélectionnées du compte actuel par celles de la sauvegarde. Un instantané de sécurité sera conservé.')}
+        <p style="font-size:12.5px; color:var(--danger-text); line-height:1.5; margin:12px 0 8px;">
+          {warning}
         </p>
         <input
           type="text"
           bind:value={confirmInput}
-          placeholder="RESTAURER"
+          placeholder={confirmWord}
           style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-1); font-size:14px;"
         />
-        <p style="font-size:11px; color:var(--text-3); margin-top:4px;">{$t('Tapez RESTAURER pour confirmer')}</p>
+        <p style="font-size:11px; color:var(--text-3); margin-top:4px;">{$t('Tapez {word} pour confirmer').replace('{word}', confirmWord)}</p>
       {/if}
 
       {#if errorMessage}
-        <p style="font-size:12.5px; color:#EF4444; margin-top:10px;">{errorMessage}</p>
+        <p style="font-size:12.5px; color:var(--danger-text); margin-top:10px;">{errorMessage}</p>
       {/if}
 
       <div class="modal-footer" style="margin-top:16px;">
         <button class="btn btn-ghost" onclick={() => dispatch('close')} disabled={isSubmitting}>{$t('Annuler')}</button>
-        <button class="btn btn-danger" onclick={submit} disabled={!canSubmit || isSubmitting}>
+        <button class="btn btn-danger-ghost" onclick={submit} disabled={!canSubmit || isSubmitting}>
           {isSubmitting
             ? $t('Restauration en cours…')
-            : destination === 'new' ? $t('Créer et restaurer') : $t('Restaurer')}
+            : destination === 'new' ? $t('Créer et restaurer') : undo ? $t('Revenir en arrière') : $t('Restaurer')}
         </button>
       </div>
     {/if}

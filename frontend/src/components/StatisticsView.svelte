@@ -1,19 +1,20 @@
 <script lang="ts">
   
-  import { onMount, onDestroy, tick, untrack } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import ApexCharts from 'apexcharts';
   import { t, lang } from '../lib/i18n.ts';
   import { api, subscribeToEvents } from '../lib/api.js';
-  import { catStyle } from '../utils/categoryColor.js';
+  import { theme } from '../lib/theme.ts';
+  import { catDotStyle } from '../utils/categoryColor.js';
+  import Icon from './Icon.svelte';
+  import CategoryRanking from './statistics/CategoryRanking.svelte';
 
   let { account } = $props();
 
   let loading = $state(true);
-  let expensesByMonth = [];
+  let expensesByMonth = $state([]);
   let topCategories = $state([]);
   let chartBarExpenses: ApexCharts;
-  let chartPieCategories: ApexCharts;
-  let chartMonthCategories: ApexCharts;
   let unsubscribeEvents: () => void;
   let error = $state('');
 
@@ -50,8 +51,6 @@
   async function refreshStats() {
     try {
       await loadStats();
-      await tick();
-      renderCharts();
       error = '';
     } catch (e) {
       console.error(e);
@@ -62,8 +61,7 @@
   function formatAmount(value: number) {
     return new Intl.NumberFormat(($lang === 'fr' ? 'fr-FR' : 'en-US'), {
       style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0
+      currency: 'EUR'
     }).format(value);
   }
 
@@ -76,182 +74,94 @@
     });
   }
 
-  function formatCategoryTooltip(total: number, avgPerMonth: number): string {
-    const avgLabel = $t('Moy.');
-    return `${formatAmount(total)} — ${avgLabel} ${formatAmount(avgPerMonth)}${$t('/mois')}`;
+  // Axis ticks: whole euros, the tooltip and the lists carry the cents.
+  function formatAxis(value: number) {
+    return new Intl.NumberFormat(($lang === 'fr' ? 'fr-FR' : 'en-US'), {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0
+    }).format(value);
   }
 
+  // Expenses are the series to follow: they take the accent, income stays neutral beside it.
   function renderCharts() {
-    if (chartBarExpenses) {
-      chartBarExpenses.destroy();
-      chartBarExpenses = undefined;
-    }
-    if (chartPieCategories) {
-      chartPieCategories.destroy();
-      chartPieCategories = undefined;
-    }
-    if (chartMonthCategories) {
-      chartMonthCategories.destroy();
-      chartMonthCategories = undefined;
-    }
+    chartBarExpenses?.destroy();
+    chartBarExpenses = undefined;
 
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = isDark ? '#cbd5e1' : '#475569';
-    const gridColor = isDark ? '#334155' : '#e2e8f0';
+    const el = document.querySelector<HTMLElement>('#chart-expenses');
+    if (!el || expensesByMonth.length === 0) return;
 
-    // Bar Chart - Expenses & Income
-    if (expensesByMonth.length > 0) {
-      chartBarExpenses = new ApexCharts(document.querySelector('#chart-expenses'), {
-        series: [
-          { name: $t('Revenus'), data: expensesByMonth.map(m => m.income) },
-          { name: $t('Dépenses'), data: expensesByMonth.map(m => m.expenses) }
-        ],
-        chart: { type: 'bar', height: 300, toolbar: { show: false }, sparkline: { enabled: false } },
-        plotOptions: { bar: { horizontal: false, columnWidth: '55%', dataLabels: { position: 'top' } } },
-        dataLabels: { enabled: false },
-        stroke: { show: true, width: 2, colors: ['transparent'] },
-        xaxis: {
-          categories: expensesByMonth.map(m => formatDate(m.month)),
-          labels: { style: { colors: textColor, fontSize: '12px' } }
-        },
-        yaxis: { labels: { style: { colors: textColor, fontSize: '12px' } } },
-        fill: { opacity: 0.85 },
-        grid: { borderColor: gridColor },
-        colors: ['#10b981', '#ef4444'],
-        tooltip: {
-          theme: isDark ? 'dark' : 'light',
-          y: {
-            formatter: (val: number) => formatAmount(val)
-          }
-        },
-        legend: {
-          position: 'bottom',
-          fontSize: '12px',
-          labels: {
-            colors: textColor
-          }
+    const css = getComputedStyle(document.documentElement);
+    const token = (name: string) => css.getPropertyValue(name).trim();
+    const labels = { colors: token('--text-3'), fontSize: '12px', fontFamily: token('--font-mono') };
+
+    chartBarExpenses = new ApexCharts(el, {
+      series: [
+        { name: $t('Revenus'), data: expensesByMonth.map(m => m.income) },
+        { name: $t('Dépenses'), data: expensesByMonth.map(m => m.expenses) }
+      ],
+      chart: {
+        type: 'bar',
+        height: 520,
+        fontFamily: token('--font-ui'),
+        toolbar: { show: false },
+        zoom: { enabled: false },
+        animations: { enabled: false }
+      },
+      // Thin columns rounded at the data end; the transparent stroke is the gap inside a pair.
+      plotOptions: { bar: { columnWidth: '44%', borderRadius: 4, borderRadiusApplication: 'end' } },
+      dataLabels: { enabled: false },
+      stroke: { show: true, width: 2, colors: ['transparent'] },
+      colors: [token('--chart-neutral'), token('--chart-accent')],
+      fill: { opacity: 1 },
+      xaxis: {
+        categories: expensesByMonth.map(m => formatDate(m.month)),
+        labels: { style: labels, rotate: 0, hideOverlappingLabels: true },
+        axisBorder: { color: token('--border') },
+        axisTicks: { show: false },
+        crosshairs: { show: false }
+      },
+      yaxis: { tickAmount: 4, forceNiceScale: true, labels: { style: labels, formatter: formatAxis } },
+      grid: { borderColor: token('--border'), strokeDashArray: 0 },
+      tooltip: {
+        theme: $theme,
+        shared: true,
+        intersect: false,
+        y: { formatter: (val: number) => formatAmount(val) }
+      },
+      legend: {
+        position: 'top',
+        horizontalAlign: 'left',
+        fontSize: '13px',
+        labels: { colors: token('--text-2') },
+        markers: { size: 5, shape: 'circle', strokeWidth: 0, offsetX: -4 },
+        itemMargin: { horizontal: 12 }
+      },
+      // 520 is for the wide layout, where the chart stands next to the rankings
+      responsive: [{
+        breakpoint: 1800,
+        options: { chart: { height: 320 } }
+      }, {
+        breakpoint: 640,
+        options: {
+          chart: { height: 320 },
+          plotOptions: { bar: { columnWidth: '76%', borderRadius: 2 } },
+          xaxis: { labels: { rotate: -45, rotateAlways: true } }
         }
-      });
-      chartBarExpenses.render();
-    }
-
-// Pie Chart - Top Categories
-    if (topCategories.length > 0) {
-      chartPieCategories = new ApexCharts(document.querySelector('#chart-categories'), {
-        series: topCategories.map(c => c.value),
-        chart: { type: 'pie', height: 450, toolbar: { show: false } },
-        labels: topCategories.map(c => c.name),
-        colors: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'],
-        plotOptions: {
-          pie: {
-            dataLabels: {
-              offset: 0
-            },
-            donut: {
-              size: '65%'
-            }
-          }
-        },
-        dataLabels: {
-          formatter: (val: number, { seriesIndex }) => {
-            const total = topCategories.reduce((sum, c) => sum + c.value, 0);
-            const percentage = Math.round((topCategories[seriesIndex].value / total) * 100);
-            return percentage + '%';
-          },
-          style: {
-            colors: ['#ffffff'],
-            fontSize: '16px',
-            fontWeight: 600
-          },
-          dropShadow: {
-            enabled: true,
-            top: 2,
-            left: 2,
-            blur: 6,
-            opacity: 0.8,
-            color: '#000000'
-          }
-        },
-        tooltip: {
-          theme: isDark ? 'dark' : 'light',
-          y: {
-            formatter: (val: number, { seriesIndex }) => {
-              const cat = topCategories[seriesIndex];
-              return formatCategoryTooltip(val, cat.avgPerMonth);
-            }
-          }
-        },
-        legend: {
-          position: 'bottom',
-          fontSize: '12px',
-          labels: {
-            colors: textColor
-          }
-        }
-      });
-      chartPieCategories.render();
-    }
-
-    // Pie Chart - Month Categories
-    if (monthCategoriesData.length > 0) {
-      chartMonthCategories = new ApexCharts(document.querySelector('#chart-month-categories'), {
-        series: monthCategoriesData.map(c => c.value),
-        chart: { type: 'pie', height: 450, toolbar: { show: false } },
-        labels: monthCategoriesData.map(c => c.name),
-        colors: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'],
-        plotOptions: {
-          pie: {
-            dataLabels: {
-              offset: 0
-            },
-            donut: {
-              size: '65%'
-            }
-          }
-        },
-        dataLabels: {
-          formatter: (val: number, { seriesIndex }) => {
-            const total = monthCategoriesData.reduce((sum, c) => sum + c.value, 0);
-            const percentage = Math.round((monthCategoriesData[seriesIndex].value / total) * 100);
-            return percentage + '%';
-          },
-          style: {
-            colors: ['#ffffff'],
-            fontSize: '16px',
-            fontWeight: 600
-          },
-          dropShadow: {
-            enabled: true,
-            top: 2,
-            left: 2,
-            blur: 6,
-            opacity: 0.8,
-            color: '#000000'
-          }
-        },
-        tooltip: {
-          theme: isDark ? 'dark' : 'light',
-          y: {
-            formatter: (val: number) => formatAmount(val)
-          }
-        },
-        legend: {
-          position: 'bottom',
-          fontSize: '12px',
-          labels: {
-            colors: textColor
-          }
-        }
-      });
-      chartMonthCategories.render();
-    }
+      }]
+    });
+    chartBarExpenses.render();
   }
+
+  // Colors and labels are read when the chart is drawn, so a theme or language change redraws it.
+  $effect(() => {
+    $theme; $lang; expensesByMonth; loading;
+    untrack(() => { if (!loading) renderCharts(); });
+  });
 
   async function handleMonthChange() {
     try {
       await loadMonthCategories(selectedMonth);
-      await tick();
-      renderCharts();
     } catch (e) {
       console.error(e);
       error = e.message || $t('Erreur lors du chargement des catégories');
@@ -270,8 +180,6 @@
     } finally {
       loading = false;
     }
-    await tick();
-    renderCharts();
 
     unsubscribeEvents = subscribeToEvents((event) => {
       if (event.type === 'transactions-changed' && event.accountId === account.id) {
@@ -283,8 +191,6 @@
   onDestroy(() => {
     unsubscribeEvents?.();
     chartBarExpenses?.destroy();
-    chartPieCategories?.destroy();
-    chartMonthCategories?.destroy();
   });
 </script>
 
@@ -309,29 +215,32 @@
         <h3>{$t('Dépenses et revenus mensuels')}</h3>
         <span class="chart-period">{$t('12 derniers mois')}</span>
       </div>
-      <div id="chart-expenses"></div>
+      {#if expensesByMonth.length === 0}
+        <div class="state-empty">{$t('Aucune opération')}</div>
+      {:else}
+        <div id="chart-expenses"></div>
+      {/if}
     </div>
 
     <!-- Top Categories -->
-    <div class="chart-container pie-chart-container">
+    <div class="chart-container">
       <div class="chart-header">
         <h3>{$t('Top 10 catégories')}</h3>
         <span class="chart-period">{$t('12 derniers mois')}</span>
       </div>
-      <div id="chart-categories"></div>
+      {#if topCategories.length === 0}
+        <div class="state-empty">{$t('Aucune opération')}</div>
+      {:else}
+        <CategoryRanking items={topCategories} format={formatAmount} />
+      {/if}
     </div>
 
     <!-- Month Categories -->
-    <div class="chart-container pie-chart-container">
+    <div class="chart-container">
       <div class="chart-header">
         <h3>{$t('Dépenses par catégorie')}</h3>
         <div class="month-selector-wrapper">
-          <svg class="month-selector-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
+          <Icon name="calendar" />
           <select bind:value={selectedYear} onchange={handleMonthChange} class="month-select">
             {#each [2024, 2025, 2026, 2027] as year}
               <option value={year}>{year}</option>
@@ -347,19 +256,17 @@
         </div>
       </div>
       {#if monthCategoriesData.length === 0}
-        <div style="padding: 40px; text-align: center; color: var(--text-3);">
-          {$t('Aucune transaction pour ce mois')}
-        </div>
+        <div class="state-empty">{$t('Aucune transaction pour ce mois')}</div>
       {:else}
-        <div id="chart-month-categories"></div>
+        <CategoryRanking items={monthCategoriesData} format={formatAmount} />
       {/if}
     </div>
 
     <!-- Top Categories Table -->
     <div class="table-container">
-      <div style="display: flex; align-items: baseline; gap: 8px;">
+      <div class="chart-header">
         <h3>{$t('Détail des catégories')}</h3>
-        <span style="font-size: 12px; color: var(--text-3);">{$t('12 derniers mois')}</span>
+        <span class="chart-period">{$t('12 derniers mois')}</span>
       </div>
       <table class="categories-table">
         <thead>
@@ -373,7 +280,7 @@
           {#each topCategories as cat}
             <tr>
               <td>
-                <span class="cat-badge" style="font-size: 12.5px; padding: 3px 10px; {catStyle(cat.name)}">{cat.name}</span>
+                <span class="cat-name" style={catDotStyle(cat.name)}>{cat.name}</span>
               </td>
               <td class="amount-col">{formatAmount(cat.value)}</td>
               <td class="count-col">{cat.count}</td>
@@ -391,197 +298,139 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    background: #fee;
-    border: 1px solid #fcc;
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #c00;
-    margin-bottom: 16px;
+    margin: 0 0 16px;
   }
 
   .error-banner-close {
     background: none;
     border: none;
-    color: #c00;
+    color: inherit;
     cursor: pointer;
     font-size: 16px;
     line-height: 1;
-    padding: 0 2px;
+    padding: 0 4px;
     flex-shrink: 0;
   }
 
-  .page-header {
-    margin-bottom: 24px;
-  }
-
-  .page-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-1);
-    margin: 0;
-    font-family: 'Inter', sans-serif;
-  }
-
+  /* One main chart across the page, the two rankings at different widths, then the figures. */
   .stats-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 16px;
+    align-items: start;
   }
+  .chart-expenses-container,
+  .table-container { grid-column: 1 / -1; }
 
-  .chart-expenses-container {
-    width: 100%;
-  }
-
-  .chart-container {
-    background: var(--surface);
-    border-radius: 10px;
+  .chart-container,
+  .table-container {
+    min-width: 0;
     padding: 16px;
+    background: var(--card);
     border: 1px solid var(--border);
+    border-radius: 12px;
   }
 
   .chart-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    min-height: 32px;
+    margin-bottom: 12px;
   }
 
-  .chart-container h3 {
+  h3 {
     margin: 0;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 500;
     color: var(--text-1);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
   }
 
   .chart-period {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 13px;
     color: var(--text-3);
     white-space: nowrap;
   }
 
-  .pie-chart-container {
-    width: 100%;
-  }
-
-
-  .table-container {
-    width: 100%;
-    background: var(--surface);
-    border-radius: 10px;
-    padding: 16px;
-    border: 1px solid var(--border);
-  }
-
-  .table-container h3 {
-    margin: 0 0 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-1);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
+  /* ApexCharts reserves an empty band under the axis labels */
+  #chart-expenses { min-height: 320px; margin-bottom: -24px; }
 
   .categories-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-size: 14px;
   }
-
-  .categories-table thead {
-    background: var(--card);
-  }
-
   .categories-table th {
-    padding: 10px 12px;
+    height: 36px;
+    padding: 0 8px;
     text-align: left;
-    font-weight: 600;
-    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-3);
     border-bottom: 1px solid var(--border);
   }
-
-  .categories-table th.amount-col {
-    text-align: right;
-  }
-
-  .categories-table th.count-col {
-    text-align: center;
-  }
-
   .categories-table td {
-    padding: 10px 12px;
+    height: 40px;
+    padding: 0 8px;
     border-bottom: 1px solid var(--border);
     color: var(--text-1);
   }
+  .categories-table tbody tr:last-child td { border-bottom: none; }
 
-  .amount-col {
-    text-align: right;
-    font-family: 'Fira Code', monospace;
-    color: var(--text-2);
-  }
-
-  .count-col {
-    text-align: center;
-    color: var(--text-3);
-  }
-
-  .state-loading {
-    display: flex;
+  .cat-name {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    height: 300px;
-    color: var(--text-3);
-    font-size: 14px;
+    gap: 8px;
   }
+  .cat-name::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dot);
+  }
+  :global([data-theme="dark"]) .cat-name::before { background: color-mix(in oklab, var(--dot), white 25%); }
+
+  .categories-table .amount-col,
+  .categories-table .count-col { text-align: right; }
+  .categories-table td.amount-col { font-family: var(--font-mono); }
+  .categories-table td.count-col { font-family: var(--font-mono); color: var(--text-2); }
 
   .month-selector-wrapper {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    height: 32px;
+    padding: 0 8px;
     border: 1px solid var(--border);
     border-radius: 8px;
-    background: var(--card);
-    transition: all 0.2s ease;
+    color: var(--text-3);
+    transition: background-color 150ms var(--ease);
   }
-
-  .month-selector-wrapper:hover {
-    background: var(--surface);
-    border-color: #3b82f6;
-  }
-
-  .month-selector-icon {
-    width: 18px;
-    height: 18px;
-    color: var(--text-2);
-    flex-shrink: 0;
-    stroke-width: 1.5;
-  }
+  .month-selector-wrapper:hover { background: var(--card-hover); }
 
   .month-select {
     border: none;
     background: transparent;
     color: var(--text-1);
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
-    font-weight: 500;
+    font-family: var(--font-ui);
     cursor: pointer;
-    padding: 4px 0;
-    flex: 1;
   }
-
-  .month-select:focus {
-    outline: none;
-  }
-
   .month-select option {
-    background: var(--surface);
+    background: var(--card);
     color: var(--text-1);
   }
 
+  /* Wide screens: chart and both rankings on one row */
+  @media (min-width: 1800px) {
+    .stats-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+    .chart-expenses-container { grid-column: auto; }
+  }
+
+  @media (max-width: 1080px) {
+    .stats-grid { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>

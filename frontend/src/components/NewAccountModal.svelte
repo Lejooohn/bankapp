@@ -44,7 +44,7 @@
     </div>
     <div class="field">
       <label>{$t('Solde initial')} ({$t('optionnel')})
-      <input type="number" bind:value={balance} placeholder="0.00" step="0.01" style="font-family:'Fira Code',monospace;" /></label>
+      <input type="number" bind:value={balance} placeholder="0.00" step="0.01" style="font-family:var(--font-mono);" /></label>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick={() => dispatch('close')}>{$t('Annuler')}</button>

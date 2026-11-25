@@ -90,7 +90,7 @@
     <div class="field-row">
       <div class="field">
         <label for="et-amount">{$t('Montant')} <span class="req">*</span></label>
-        <input id="et-amount" type="number" bind:value={formData.amount} oninput={(e) => { const val = parseFloat(e.currentTarget.value); if (val < 0) e.currentTarget.value = String(Math.abs(val)); }} step="0.01" min="0" style="font-family:'Fira Code',monospace;" />
+        <input id="et-amount" type="number" bind:value={formData.amount} oninput={(e) => { const val = parseFloat(e.currentTarget.value); if (val < 0) e.currentTarget.value = String(Math.abs(val)); }} step="0.01" min="0" style="font-family:var(--font-mono);" />
       </div>
       <div class="field">
         <label for="et-type">{$t('Mode')} <span class="req">*</span></label>

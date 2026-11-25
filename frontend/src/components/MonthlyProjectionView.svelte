@@ -170,10 +170,12 @@
       if (!chartEl) return;
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = isDark ? '#8B949E' : '#64748B';
-    const gridColor = isDark ? '#2D3748' : '#E2E8F0';
-    const realColor = isDark ? '#60A5FA' : '#2563EB';
-    const projectedColor = isDark ? '#C4B5FD' : '#8B5CF6';
+    const css = getComputedStyle(document.documentElement);
+    const token = (name: string) => css.getPropertyValue(name).trim();
+    const textColor = token('--text-3');
+    const gridColor = token('--border');
+    const realColor = token('--chart-accent');
+    const projectedColor = token('--acct-investment');
 
     const round = (v: number) => Math.round(v * 100) / 100;
     const realData = months.map((m, idx) => idx <= TODAY_INDEX ? round(m.balance) : null);
@@ -309,7 +311,7 @@
   }
 
   .page-title {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--font-ui);
     font-size: 22px;
     font-weight: 700;
     color: var(--text-1);
@@ -357,7 +359,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   .categories-table thead {
@@ -388,7 +390,7 @@
 
   .amount-col {
     text-align: right;
-    font-family: 'Fira Code', monospace;
+    font-family: var(--font-mono);
   }
 
   .categories-table td.credit-text {

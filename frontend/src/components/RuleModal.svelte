@@ -427,7 +427,7 @@
     border-radius: 4px;
     font-size: 12px;
     color: var(--chip-text);
-    font-family: 'Fira Code', monospace;
+    font-family: var(--font-mono);
     cursor: pointer;
     user-select: none;
   }
@@ -489,7 +489,7 @@
     background: var(--input-bg);
     color: var(--text-1);
     font-size: 12px;
-    font-family: 'Fira Code', monospace;
+    font-family: var(--font-mono);
     min-width: 120px;
   }
 
@@ -510,7 +510,7 @@
     background: var(--input-bg);
     color: var(--text-1);
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     transition: border-color 0.2s;
   }
 
@@ -548,7 +548,7 @@
     background: var(--input-bg);
     color: var(--text-1);
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
     margin-bottom: 12px;
     transition: border-color 0.2s;
   }

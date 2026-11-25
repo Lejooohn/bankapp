@@ -140,7 +140,7 @@
               <td class="tx-date">{fmtDate(tx.date, locale)}</td>
               <td class="tx-tiers-cell"><div class="tx-tiers-name">{tx.tiers || tx.description || '—'}</div></td>
               <td class="r">
-                <span class="tx-amount {parseFloat(tx.amount) >= 0 ? 'pos' : 'neg'}">{fmtAmount(tx.amount)}</span>
+                <span class="tx-amount {parseFloat(tx.amount) >= 0 ? 'pos' : 'neg'}">{fmtAmount(tx.amount, locale)}</span>
               </td>
               <td style="font-size:12px;">
                 <span style="color:var(--text-3);">{$t('il y a {n} j').replace('{n}', String(daysSince(tx.deleted_at)))}</span>
@@ -188,7 +188,7 @@
     border-bottom: 1px solid #FDE68A;
     font-size: 12.5px;
     color: var(--warn-text);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
 
   /* Reconciled = done → muted text so pending rows pop */

@@ -50,3 +50,28 @@ describe('restoreToCurrentAccount reads from the request-scoped staging schema',
     expect(calls.some(s => s.includes('restore_staging'))).toBe(false);
   });
 });
+
+describe('rules from a backup older than the deleted_at column', () => {
+  const columns = ['id', 'account_id', 'category', 'active'];
+
+  it('stay hidden when they were inactive', () => {
+    const script = buildStagingScript({ categorization_rules: { columns, dataLines: '' } }, 'restore_stg_x');
+    expect(script).toContain('UPDATE restore_stg_x.categorization_rules SET deleted_at = NOW() WHERE active = false;');
+  });
+
+  it('are left alone when the dump already has the column', () => {
+    const script = buildStagingScript({ categorization_rules: { columns: [...columns, 'deleted_at'], dataLines: '' } }, 'restore_stg_x');
+    expect(script).not.toContain('SET deleted_at');
+  });
+
+  it('stay hidden when they come from an older safety snapshot', async () => {
+    const calls: any[] = [];
+    const client: any = { query: async (sql: string, params: any[]) => { calls.push({ sql, params }); return { rowCount: 1, rows: [] }; } };
+    const { restoreFromSafetySnapshot } = await import('./backup-restore-apply.js');
+    await restoreFromSafetySnapshot(client, { accountId: 'a', userId: 'u', snapshot: { categorization_rules: [{ id: '1', active: false }, { id: '2', active: true }] } });
+    const insert = calls.find(c => c.sql.startsWith('INSERT'));
+    expect(insert.sql).toContain('(id, active, deleted_at)');
+    expect(insert.params[2]).toBeInstanceOf(Date);
+    expect(insert.params[5]).toBeNull();
+  });
+});

@@ -181,7 +181,7 @@
   }
   .modal-title {
     font-size: 14px; font-weight: 600; color: var(--text-1);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
   .modal-close {
     background: none; border: none; cursor: pointer;
@@ -199,12 +199,12 @@
   .field-label {
     font-size: 11px; font-weight: 600; text-transform: uppercase;
     letter-spacing: 0.07em; color: var(--text-3);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-ui);
   }
   :global(.date-input) {
     flex: 1; padding: 6px 10px; border: 1px solid var(--border);
     border-radius: 7px; background: var(--input-bg);
-    color: var(--text-1); font-size: 13px; font-family: 'Inter', sans-serif;
+    color: var(--text-1); font-size: 13px; font-family: var(--font-ui);
     outline: none;
   }
   :global(.date-input:focus) { border-color: var(--cobalt); }
@@ -214,7 +214,7 @@
   .quick-range-btn {
     padding: 4px 10px; border-radius: 20px;
     background: var(--surface); border: 1px solid var(--border);
-    color: var(--text-2); font-size: 12px; font-family: 'Inter', sans-serif;
+    color: var(--text-2); font-size: 12px; font-family: var(--font-ui);
     cursor: pointer; transition: all 0.1s;
   }
   .quick-range-btn:hover {
@@ -224,14 +224,14 @@
     display: inline-flex; align-items: center;
     padding: 3px 10px; border-radius: 20px;
     background: var(--cobalt-light); color: var(--cobalt);
-    font-size: 11.5px; font-family: 'Inter', sans-serif;
+    font-size: 11.5px; font-family: var(--font-ui);
     border: 1px solid #BFDBFE;
   }
   .btn-export {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 7px 16px; border-radius: 7px; border: none;
     font-size: 13px; font-weight: 500; cursor: pointer;
-    font-family: 'Inter', sans-serif; transition: opacity 0.1s;
+    font-family: var(--font-ui); transition: opacity 0.1s;
   }
   .btn-export:disabled { opacity: 0.6; cursor: default; }
   .btn-csv { background: #166534; color: #DCFCE7; }
@@ -241,7 +241,7 @@
   .btn-cancel {
     margin-left: auto; background: none; border: 1px solid var(--border);
     border-radius: 7px; padding: 7px 14px; font-size: 13px;
-    color: var(--text-2); cursor: pointer; font-family: 'Inter', sans-serif;
+    color: var(--text-2); cursor: pointer; font-family: var(--font-ui);
   }
   .btn-cancel:hover { background: var(--surface); }
   .spinner {

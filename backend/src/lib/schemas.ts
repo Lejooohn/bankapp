@@ -1,6 +1,20 @@
 // Zod request schemas shared across route modules. Validation stays in the route handlers.
 
 import { z } from 'zod';
+import { BACKUP_CATEGORIES, MANUAL_FILENAME_RE } from '../services/backup-files.js';
+
+// Query of the operation list: `since` returns every operation from that day on, whatever the page size.
+export const transactionListQuerySchema = z.object({
+  since: z.iso.date('Format de date invalide').optional(),
+});
+
+// Level of a full dump. Optional for names that only exist in one place (older clients).
+export const backupCategorySchema = z.enum(BACKUP_CATEGORIES).optional();
+
+// Manual backups to delete: the file names the user saw, so a backup made since is never included.
+export const deleteManualBackupsSchema = z.object({
+  filenames: z.array(z.string().regex(MANUAL_FILENAME_RE, 'Nom de fichier de sauvegarde invalide')).min(1).max(1000),
+});
 
 // Auth routes (public, no user context required)
 export const loginSchema = z.object({
@@ -113,6 +127,22 @@ export const scheduleSchema = z.object({
   target_account_id: z.string().uuid().nullable().optional(),
 });
 
+// Partial update: an absent field is kept as stored, an explicit null clears a nullable field.
+// No defaults here, a default would overwrite the stored value.
+export const patchScheduleSchema = z.object({
+  description: z.string().min(1, 'Description requise').optional(),
+  amount: z.number().positive('Montant doit être positif').optional(),
+  transaction_type: z.string().min(1, 'Type requis').optional(),
+  category: z.string().nullable().optional(),
+  details: z.string().nullable().optional(),
+  frequency: z.enum(['MONTHLY', 'QUARTERLY', 'BIANNUAL', 'ANNUAL']).optional(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format date invalide').optional(),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format date invalide').nullable().optional(),
+  day_of_month: z.number().int().min(1, 'Le jour du mois doit être un entier entre 1 et 31').max(31, 'Le jour du mois doit être un entier entre 1 et 31').optional(),
+  skip_weekends: z.boolean().optional(),
+  target_account_id: z.string().uuid().nullable().optional(),
+  is_active: z.boolean().optional(),
+});
 
 // Second factor (TOTP or recovery code). The code is normalised by the handler.
 export const mfaVerifySchema = z.object({

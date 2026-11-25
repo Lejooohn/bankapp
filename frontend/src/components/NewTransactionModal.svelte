@@ -82,7 +82,7 @@
         <input type="number" bind:value={amount} 
           oninput={(e) => { const val = parseFloat(e.currentTarget.value); if (val < 0) e.currentTarget.value = String(Math.abs(val)); }}
           step="0.01" placeholder="0.00" min="0" 
-          style="font-family:'Fira Code',monospace;" 
+          style="font-family:var(--font-mono);" 
           class:invalid={!amountValid} 
         /></label>
       </div>
